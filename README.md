@@ -4,7 +4,7 @@
   <br>
 </h1>
 
-<h3 align="center">A multi-chat high-productivity workground.</h3>
+<h3 align="center">Confab is for multi-model research conversations and document workflows.</h3>
 
 <p align="center">
   <a href="#value-proposition">Value Proposition</a> •
@@ -14,155 +14,57 @@
 </p>
 <hr>
 
-Confab is a FastAPI-based multi-model chat workspace with a packaged web UI, Supabase-backed persistence, and email magic-link authentication.
+# Value Proposition
 
-Current implementation uses:
+Confab collapses multi-model chat, consensus synthesis, PR review, and document iteration into one cohesive app with persistent history and strict per-user workspace isolation.
 
-- FastAPI + packaged static frontend (`confab/static/gui.html`)
-- PostgreSQL persistence through Supabase (`SUPABASE_DB`)
-- Supabase Auth magic-link login
-- Domain-restricted access (default: `@<your-domain>`)
-- Custom SMTP via Resend for production-ready email delivery
+# Quick Start
 
-## 1) Prerequisites
+If your environment is already configured, use these three examples:
 
-- Python `3.10+`
-- A local virtual environment named `venv`
-- A Supabase project
-- A Resend account with verified sending domain/subdomain (for Auth emails)
-- API keys for Claude, OpenAI, XAI, and Gemini
-
-## 2) Local environment
-
-Create `venv` and install dependencies:
-
-```bash
-python3.10 -m venv venv
-source venv/bin/activate
-pip install -e .
-```
-
-Create `.env` in project root:
-
-```env
-ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
-XAI_API_KEY=
-GEMINI_API_KEY=
-
-SUPABASE_DB=postgresql://...
-SUPABASE_URL=https://<project-ref>.supabase.co
-SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-
-DOMAIN=<your-domain>
-```
-
-Notes:
-
-- `SUPABASE_DB` is used for SQLAlchemy persistence.
-- `SUPABASE_URL` + `SUPABASE_ANON_KEY` are injected into the frontend.
-- `SUPABASE_SERVICE_ROLE_KEY` is recommended for backend-triggered magic-link sending.
-- `DOMAIN` controls which email domain is allowed for login in backend and UI.
-
-## 3) Supabase project setup
-
-### Database
-
-- Create a Supabase project.
-- Set `SUPABASE_DB` to your direct/pooled Postgres connection string.
-- Confab initializes and migrates required tables on startup.
-
-### Auth URL configuration
-
-In Supabase `Authentication -> URL Configuration`:
-
-- `Site URL`: your primary app URL (local: `http://localhost:8000`, prod: `https://chat.<your-domain>`)
-- `Additional Redirect URLs`:
-  - `http://localhost:8000`
-  - `http://127.0.0.1:8000`
-  - `https://chat.<your-domain>` (and optionally your temporary Render URL)
-
-If redirect URLs are not allowlisted, Supabase falls back to `Site URL`.
-
-## 4) Resend SMTP setup (required for reliable magic links)
-
-Supabase default email service has strict limits and is not suitable for this app.
-
-Configure custom SMTP in Supabase `Authentication -> SMTP`:
-
-- Host: `smtp.resend.com`
-- Port: `465`
-- Username: `resend`
-- Password: your Resend API key
-- Sender name: `Confab`
-- Sender email: an address on your verified domain/subdomain, for example:
-  - `noreply@mailer.<your-domain>`
-
-Resend must show sending records as verified before external delivery works.
-
-## 5) Run locally
+1) Running the app
 
 ```bash
 source venv/bin/activate
 uvicorn confab.server:app --reload
 ```
 
-Open:
+2) Using the REST API
 
-- `http://localhost:8000`
+```bash
+curl -X POST "http://localhost:8000/api/auth/magic-link" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@<your-domain>","email_redirect_to":"http://localhost:8000"}'
+```
 
-## 6) Authentication behavior
+3) Using the CLI
 
-- Login is email magic-link based.
-- Magic-link requests go through backend endpoint `POST /api/auth/magic-link`.
-- Backend enforces domain restriction (`DOMAIN` from `.env`) before requesting Supabase OTP.
-- All data endpoints are auth-protected and user-scoped.
-- Conversation history and settings are isolated per user.
+```bash
+source venv/bin/activate
+python -m confab "Compare the strategic pros and cons of launching this week vs next week."
+```
 
-## 7) Deploying on Render (`chat.<your-domain>`)
+For complete setup, API auth flow, and deployment instructions, see [Get Started](docs/Developer/Get-Started.md).
 
-This repository includes a Render Blueprint at `render.yaml`.
+# Contributing
 
-Blueprint defaults:
+The simplest way to contribute is by joining open discussions or picking up an issue:
 
-- Region: `frankfurt`
-- Auto deploy: enabled
-- Runtime: Python `3.10.14`
-- Build command: `pip install -e .`
-- Start command: `uvicorn confab.server:app --host 0.0.0.0 --port $PORT`
+- [Open discussions](https://github.com/Vaquum/Confab/issues?q=is%3Aissue%20state%3Aopen%20label%3Aquestion%2Fdiscussion)
+- [Open issues](https://github.com/Vaquum/Confab/issues)
 
-Deploy with blueprint:
+Before contributing, start with [Get Started](docs/Developer/Get-Started.md).
 
-1. In Render, choose `New +` -> `Blueprint`.
-2. Connect this repository and select branch.
-3. Confirm service creation from `render.yaml`.
-4. Set required secret env vars in Render dashboard:
-   - `ANTHROPIC_API_KEY`
-   - `OPENAI_API_KEY`
-   - `XAI_API_KEY`
-   - `GEMINI_API_KEY`
-   - `SUPABASE_DB`
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `DOMAIN=<your-domain>`
-5. Deploy.
+# Vulnerabilities
 
-After deploy:
+Report vulnerabilities privately through [GitHub Security Advisories](https://github.com/Vaquum/Confab/security/advisories/new).
 
-- Attach custom domain `chat.<your-domain>` in Render.
-- Set Supabase `Site URL` to `https://chat.<your-domain>`.
-- Add production URL and local URLs to Supabase `Additional Redirect URLs`.
+# Citations
 
-## 8) Quick troubleshooting
+If you use Confab for published work, please cite:
 
-- `Supabase auth is not configured on the server`:
-  - Missing `SUPABASE_URL` or `SUPABASE_ANON_KEY`
-- Magic link opens wrong host (for example `localhost:3000`):
-  - Fix Supabase URL configuration allowlist + `Site URL`
-- `Error sending confirmation email`:
-  - Check Supabase SMTP settings
-  - Confirm Resend domain verification and sender address domain
-- Non-`@<your-domain>` sign-in attempts:
-  - Rejected by frontend validation and backend enforcement
+Confab [Computer software]. (2026). Retrieved from http://github.com/vaquum/confab.
+
+# License
+
+[MIT License](LICENSE).

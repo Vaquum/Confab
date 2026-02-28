@@ -100,3 +100,19 @@
 - Add project metadata sections for `readme`, `authors`, `license`, optional dependencies, and project URLs.
 - Add full Ruff lint configuration blocks aligned with template defaults and set `known-first-party` to `confab`.
 - Update setuptools package discovery to template-style `find` configuration while preserving static package data.
+
+## v0.5.9 on 28th of February, 2026
+
+- Refactor `README.md` to strictly follow the Vaquum standard format and keep it focused on immediate app run flow.
+- Move full setup and deployment instructions to `docs/Developer/Get-Started.md`.
+- Link `README.md` quick start to the new developer guide for complete onboarding details.
+
+## v0.5.10 on 28th of February, 2026
+
+- Update `README.md` Quick Start with three explicit runnable examples for app startup, REST API usage, and CLI usage.
+- Keep setup and deployment depth in `docs/Developer/Get-Started.md` while preserving lightweight README onboarding.
+
+## v0.5.11 on 28th of February, 2026
+
+- Add comprehensive API documentation at `docs/Developer/API-Reference.md` covering auth model, endpoint contracts, payload schemas, and SSE event flows.
+- Add comprehensive CLI documentation at `docs/Developer/CLI.md` covering command behavior, environment requirements, output semantics, and troubleshooting.
