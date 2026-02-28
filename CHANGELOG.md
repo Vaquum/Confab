@@ -123,3 +123,10 @@
 - Fix auth response parsing in `confab/server.py` to handle invalid JSON from upstream providers without raising internal server errors.
 - Fix magic-link UI flow in `confab/static/gui.html` to always re-enable the submit button after network failures.
 - Harden legacy migration in `confab/db.py` to enforce non-null `opinions.user_id` on PostgreSQL after backfill.
+
+## v0.6.0 on 28th of February, 2026
+
+- Add Playwright end-to-end harness with `playwright.config.ts` and deterministic browser tests under `e2e/`.
+- Add reusable network mocks for Supabase auth and `/api/*` flows in `e2e/support/` to cover full GUI interaction paths without app-code changes.
+- Add CI workflow `.github/workflows/pr_checks_playwright.yml` to run Playwright in pull requests and upload failure artifacts.
+- Add Node/Playwright ignore rules to `.gitignore` and document local e2e execution in `docs/Developer/Get-Started.md`.
