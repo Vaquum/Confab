@@ -1246,7 +1246,7 @@
   <div class="auth-gate" id="authGate" style="display:none;">
     <div class="auth-card">
       <h2>Sign in to Confab</h2>
-      <p>Use an email magic link. All chats and settings are isolated per user account.</p>
+      <p>Use an email magic link. Only <code id="allowedDomainBadge">@&lt;your-domain&gt;</code> emails are allowed.</p>
       <input class="auth-input" id="authEmail" type="email" placeholder="you@example.com" autocomplete="email">
       <div class="auth-actions">
         <button class="btn-auth" id="btnAuthMagicLink" onclick="sendMagicLink()">Send magic link</button>
@@ -1493,6 +1493,7 @@
 <script>
   const SUPABASE_URL = __SUPABASE_URL__;
   const SUPABASE_ANON_KEY = __SUPABASE_ANON_KEY__;
+  const ALLOWED_EMAIL_DOMAIN = __ALLOWED_EMAIL_DOMAIN__;
   const supabaseClient = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
@@ -1507,7 +1508,14 @@
   let authReady = false;
   let typoSaveTimer = null;
 
+  function renderAllowedDomainBadge() {
+    const badge = document.getElementById('allowedDomainBadge');
+    if (!badge) return;
+    badge.textContent = `@${ALLOWED_EMAIL_DOMAIN}`;
+  }
+
   // --- Init ---
+  renderAllowedDomainBadge();
   initAuth();
 
   function setAuthStatus(message, isError = false) {
@@ -1581,20 +1589,33 @@
       setAuthStatus('Enter an email address.', true);
       return;
     }
+    if (email.toLowerCase().split('@')[1] !== ALLOWED_EMAIL_DOMAIN) {
+      setAuthStatus(`Only @${ALLOWED_EMAIL_DOMAIN} emails are allowed.`, true);
+      return;
+    }
 
     const button = document.getElementById('btnAuthMagicLink');
     button.disabled = true;
     setAuthStatus('Sending magic link...');
-    const { error } = await supabaseClient.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: window.location.origin,
-      },
+    const response = await fetch('/api/auth/magic-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        email_redirect_to: window.location.origin,
+      }),
     });
     button.disabled = false;
 
-    if (error) {
-      setAuthStatus(error.message || 'Unable to send magic link.', true);
+    if (!response.ok) {
+      let message = 'Unable to send magic link.';
+      try {
+        const payload = await response.json();
+        message = payload.detail || message;
+      } catch (e) {
+        message = 'Unable to send magic link.';
+      }
+      setAuthStatus(message, true);
       return;
     }
     setAuthStatus('Check your email for the sign-in link.');
@@ -1623,6 +1644,10 @@
     if (response.status === 401) {
       await signOut();
       throw new Error('Session expired. Please sign in again.');
+    }
+    if (response.status === 403) {
+      await signOut();
+      throw new Error(`Only @${ALLOWED_EMAIL_DOMAIN} emails are allowed.`);
     }
     return response;
   }

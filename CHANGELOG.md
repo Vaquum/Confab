@@ -52,3 +52,38 @@
 - Add strict user scoping for conversation reads and writes via `opinions.user_id` in `confab/db.py`.
 - Add per-user persisted typography settings with `GET /api/settings` and `PUT /api/settings`.
 - Update core chat and streaming pipelines to pass `user_id` through all persistence calls.
+
+## v0.5.1 on 27th of February, 2026
+
+- Add backend email-domain enforcement so only `@<your-domain>` users can access authenticated API routes.
+- Add frontend email-domain validation to block magic-link requests for non-`@<your-domain>` addresses.
+- Add shared `ALLOWED_EMAIL_DOMAIN` injection from `confab/server.py` into `confab/static/gui.html`.
+
+## v0.5.2 on 27th of February, 2026
+
+- Remove root compatibility module `server.py` from the repository root.
+- Standardize server startup on package entrypoint `uvicorn confab.server:app`.
+
+## v0.5.3 on 27th of February, 2026
+
+- Add backend endpoint `POST /api/auth/magic-link` that enforces `ALLOWED_EMAIL_DOMAIN` before requesting Supabase OTP delivery.
+- Update login flow in `confab/static/gui.html` to request magic links through backend domain validation.
+- Keep authenticated API-route enforcement so non-`@<your-domain>` sessions are rejected even if tokens exist.
+
+## v0.5.4 on 28th of February, 2026
+
+- Add root `README.md` with complete setup runbook for local development, Supabase auth configuration, Resend SMTP wiring, and Render deployment.
+- Document required environment variables and redirect URL allowlist behavior for magic-link login.
+- Document domain restriction behavior and troubleshooting for SMTP and auth redirect issues.
+
+## v0.5.5 on 28th of February, 2026
+
+- Replace hardcoded domain examples with `<your-domain>` placeholders in docs and UI copy for public repository safety.
+- Update auth domain fallback default to `<your-domain>` in `confab/server.py`.
+
+## v0.5.6 on 28th of February, 2026
+
+- Add support for reading login domain restriction from `.env` key `DOMAIN`.
+- Update domain-resolution logic in `confab/server.py` to normalize `DOMAIN` (including optional `@` prefix) and use it in auth enforcement.
+- Update auth dialog text in `confab/static/gui.html` to render allowed domain dynamically from server-injected config.
+- Update `README.md` to document `DOMAIN` as the primary domain configuration key.

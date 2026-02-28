@@ -61,6 +61,21 @@ init_db()
 
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY')
+SUPABASE_AUTH_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or SUPABASE_ANON_KEY
+
+
+def _normalize_domain(value):
+    domain = (value or '').strip().lower()
+    if domain.startswith('@'):
+        domain = domain[1:]
+    return domain
+
+
+ALLOWED_EMAIL_DOMAIN = (
+    _normalize_domain(os.environ.get('DOMAIN'))
+    or _normalize_domain(os.environ.get('ALLOWED_EMAIL_DOMAIN'))
+    or '<your-domain>'
+)
 
 GUI_HTML_TEMPLATE = STATIC_ROOT.joinpath('gui.html').read_text(encoding='utf-8')
 TYPOGRAPHY_CSS = STATIC_ROOT.joinpath('typography.css').read_text(encoding='utf-8')
@@ -71,6 +86,7 @@ def _render_gui_html():
         GUI_HTML_TEMPLATE
         .replace('__SUPABASE_URL__', json.dumps(SUPABASE_URL or ''))
         .replace('__SUPABASE_ANON_KEY__', json.dumps(SUPABASE_ANON_KEY or ''))
+        .replace('__ALLOWED_EMAIL_DOMAIN__', json.dumps(ALLOWED_EMAIL_DOMAIN))
     )
 
 
@@ -81,6 +97,18 @@ def _get_bearer_token(authorization):
     if len(parts) != 2 or parts[0].lower() != 'bearer' or not parts[1]:
         raise HTTPException(status_code=401, detail='Invalid authorization header')
     return parts[1]
+
+
+def _email_domain(email):
+    return email.rpartition('@')[2].strip().lower()
+
+
+def _ensure_allowed_email(email):
+    if _email_domain(email) != ALLOWED_EMAIL_DOMAIN:
+        raise HTTPException(
+            status_code=403,
+            detail=f'Only {ALLOWED_EMAIL_DOMAIN} emails are allowed',
+        )
 
 
 def _fetch_supabase_user(access_token):
@@ -102,9 +130,11 @@ def _fetch_supabase_user(access_token):
     user_id = data.get('id')
     if not user_id:
         raise HTTPException(status_code=401, detail='Unauthorized')
+    email = (data.get('email') or '').strip().lower()
+    _ensure_allowed_email(email)
     return {
         'id': user_id,
-        'email': data.get('email'),
+        'email': email,
     }
 
 
@@ -130,6 +160,11 @@ class SettingsRequest(BaseModel):
     settings: dict
 
 
+class MagicLinkRequest(BaseModel):
+    email: str
+    email_redirect_to: str | None = None
+
+
 @app.get('/', response_class=HTMLResponse)
 def index():
     return _render_gui_html()
@@ -138,6 +173,43 @@ def index():
 @app.get('/typography.css')
 def typography_css():
     return Response(content=TYPOGRAPHY_CSS, media_type='text/css')
+
+
+@app.post('/api/auth/magic-link')
+def api_send_magic_link(req: MagicLinkRequest):
+    if not SUPABASE_URL or not SUPABASE_ANON_KEY or not SUPABASE_AUTH_KEY:
+        raise HTTPException(status_code=500, detail='Supabase auth is not configured')
+
+    email = req.email.strip().lower()
+    _ensure_allowed_email(email)
+
+    payload = {
+        'email': email,
+        'create_user': True,
+    }
+    if req.email_redirect_to:
+        payload['email_redirect_to'] = req.email_redirect_to
+
+    headers = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': f'Bearer {SUPABASE_AUTH_KEY}',
+        'Content-Type': 'application/json',
+    }
+    otp_url = f"{SUPABASE_URL.rstrip('/')}/auth/v1/otp"
+    try:
+        response = requests.post(otp_url, headers=headers, json=payload, timeout=10)
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=503, detail=f'Auth provider unavailable: {exc}')
+
+    if response.status_code >= 400:
+        detail = 'Unable to send magic link'
+        try:
+            data = response.json()
+            detail = data.get('error_description') or data.get('msg') or detail
+        except ValueError:
+            pass
+        raise HTTPException(status_code=400, detail=detail)
+    return {'ok': True}
 
 
 @app.get('/api/opinions')
