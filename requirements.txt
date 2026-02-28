@@ -1,0 +1,9 @@
+anthropic
+openai
+google-genai
+python-dotenv
+fastapi
+uvicorn
+sqlalchemy
+psycopg[binary]
+requests

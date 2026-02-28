@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "new-repository-template"
-version = "0.0.1"
-description = "A repo for the template that governs how new repos are created."
+name = "confab"
+version = "0.4.0"
+description = "Synthesize answers from multiple AI models"
 readme = "README.md"
 authors = [
   { name = "Mikko Kotila", email = "mailme@mikkokotila.com" },
@@ -17,18 +17,34 @@ authors = [
 ]
 license = { text = "MIT" }
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+  "anthropic",
+  "openai",
+  "google-genai",
+  "python-dotenv",
+  "fastapi",
+  "uvicorn",
+  "sqlalchemy",
+  "psycopg[binary]",
+  "requests",
+]
 
 [project.optional-dependencies]
 
 [project.urls]
 Homepage = "https://vaquum.fi"
-Repository = "https://github.com/vaquum/new-repository-template"
+Repository = "https://github.com/Vaquum/Confab"
+
+[project.scripts]
+confab = "confab:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["new-repository-template*"]
+include = ["confab*"]
 exclude = ["tests*", "scripts*"]
+
+[tool.setuptools.package-data]
+confab = ["static/*.html", "static/*.css"]
 
 [tool.ruff]
 target-version = "py310"
@@ -99,7 +115,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 max-statements = 50
 
 [tool.ruff.lint.isort]
-known-first-party = ["new-repository-template"]
+known-first-party = ["confab"]
 section-order = [
   "future",
   "standard-library",

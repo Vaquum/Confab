@@ -1,5 +1,6 @@
 .env
 .venv
+venv
 *.egg-info
 __pycache__
 **/__pycache__/
@@ -15,6 +16,9 @@ build/
 *.egg
 *.pyc
 *.csv
+confab.db
+*.sqlite3
+*.log
 
 .idea
 .vscode
@@ -25,3 +29,4 @@ build/
 *.sw?
 
 .cursor/
+.claude/
