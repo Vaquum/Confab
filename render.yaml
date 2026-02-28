@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: confab
+    runtime: python
+    region: frankfurt
+    plan: starter
+    autoDeploy: true
+    buildCommand: pip install -e .
+    startCommand: uvicorn confab.server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.14
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: XAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SUPABASE_DB
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: DOMAIN
+        sync: false

@@ -87,3 +87,9 @@
 - Update domain-resolution logic in `confab/server.py` to normalize `DOMAIN` (including optional `@` prefix) and use it in auth enforcement.
 - Update auth dialog text in `confab/static/gui.html` to render allowed domain dynamically from server-injected config.
 - Update `README.md` to document `DOMAIN` as the primary domain configuration key.
+
+## v0.5.7 on 28th of February, 2026
+
+- Add Render Blueprint `render.yaml` with Python web service defaults, `frankfurt` region, and `autoDeploy` enabled.
+- Declare Render environment variables for AI provider keys, Supabase credentials, and `DOMAIN`.
+- Update `README.md` deployment section with blueprint-based Render setup and post-deploy URL configuration steps.

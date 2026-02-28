@@ -108,28 +108,38 @@ Open:
 
 ## 7) Deploying on Render (`chat.<your-domain>`)
 
-Set these environment variables in Render:
+This repository includes a Render Blueprint at `render.yaml`.
 
-- `ANTHROPIC_API_KEY`
-- `OPENAI_API_KEY`
-- `XAI_API_KEY`
-- `GEMINI_API_KEY`
-- `SUPABASE_DB`
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `DOMAIN=<your-domain>`
+Blueprint defaults:
 
-Start command:
+- Region: `frankfurt`
+- Auto deploy: enabled
+- Runtime: Python `3.10.14`
+- Build command: `pip install -e .`
+- Start command: `uvicorn confab.server:app --host 0.0.0.0 --port $PORT`
 
-```bash
-uvicorn confab.server:app --host 0.0.0.0 --port $PORT
-```
+Deploy with blueprint:
+
+1. In Render, choose `New +` -> `Blueprint`.
+2. Connect this repository and select branch.
+3. Confirm service creation from `render.yaml`.
+4. Set required secret env vars in Render dashboard:
+   - `ANTHROPIC_API_KEY`
+   - `OPENAI_API_KEY`
+   - `XAI_API_KEY`
+   - `GEMINI_API_KEY`
+   - `SUPABASE_DB`
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `DOMAIN=<your-domain>`
+5. Deploy.
 
 After deploy:
 
-- Set Supabase `Site URL` to `https://chat.<your-domain>`
-- Keep local dev URLs in `Additional Redirect URLs`
+- Attach custom domain `chat.<your-domain>` in Render.
+- Set Supabase `Site URL` to `https://chat.<your-domain>`.
+- Add production URL and local URLs to Supabase `Additional Redirect URLs`.
 
 ## 8) Quick troubleshooting
 
