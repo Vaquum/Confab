@@ -116,3 +116,10 @@
 
 - Add comprehensive API documentation at `docs/Developer/API-Reference.md` covering auth model, endpoint contracts, payload schemas, and SSE event flows.
 - Add comprehensive CLI documentation at `docs/Developer/CLI.md` covering command behavior, environment requirements, output semantics, and troubleshooting.
+
+## v0.5.12 on 28th of February, 2026
+
+- Fix auth-provider handling in `confab/server.py` to map upstream outages (`429` and `5xx`) to service-unavailable responses instead of unauthorized user failures.
+- Fix auth response parsing in `confab/server.py` to handle invalid JSON from upstream providers without raising internal server errors.
+- Fix magic-link UI flow in `confab/static/gui.html` to always re-enable the submit button after network failures.
+- Harden legacy migration in `confab/db.py` to enforce non-null `opinions.user_id` on PostgreSQL after backfill.

@@ -122,11 +122,23 @@ def _fetch_supabase_user(access_token):
     }
     try:
         response = requests.get(user_url, headers=headers, timeout=10)
-    except requests.RequestException as exc:
-        raise HTTPException(status_code=503, detail=f'Auth provider unavailable: {exc}')
-    if response.status_code != 200:
+    except requests.RequestException:
+        raise HTTPException(status_code=503, detail='Auth provider unavailable')
+
+    if response.status_code in (401, 403):
         raise HTTPException(status_code=401, detail='Unauthorized')
-    data = response.json()
+    if response.status_code == 429:
+        raise HTTPException(status_code=503, detail='Auth provider temporarily unavailable')
+    if 500 <= response.status_code < 600:
+        raise HTTPException(status_code=503, detail='Auth provider unavailable')
+    if response.status_code != 200:
+        raise HTTPException(status_code=503, detail='Auth provider error')
+
+    try:
+        data = response.json()
+    except ValueError:
+        raise HTTPException(status_code=503, detail='Invalid auth provider response')
+
     user_id = data.get('id')
     if not user_id:
         raise HTTPException(status_code=401, detail='Unauthorized')

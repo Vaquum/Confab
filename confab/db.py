@@ -161,6 +161,8 @@ def _migrate_user_id():
         if 'user_id' not in columns:
             conn.execute(text('ALTER TABLE opinions ADD COLUMN user_id TEXT'))
         conn.execute(text("UPDATE opinions SET user_id = 'legacy-local' WHERE user_id IS NULL"))
+        if engine.dialect.name == 'postgresql':
+            conn.execute(text('ALTER TABLE opinions ALTER COLUMN user_id SET NOT NULL'))
         conn.execute(text('CREATE INDEX IF NOT EXISTS ix_opinions_user_id ON opinions (user_id)'))
         conn.execute(
             text(

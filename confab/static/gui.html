@@ -1597,15 +1597,22 @@
     const button = document.getElementById('btnAuthMagicLink');
     button.disabled = true;
     setAuthStatus('Sending magic link...');
-    const response = await fetch('/api/auth/magic-link', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        email_redirect_to: window.location.origin,
-      }),
-    });
-    button.disabled = false;
+    let response = null;
+    try {
+      response = await fetch('/api/auth/magic-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          email_redirect_to: window.location.origin,
+        }),
+      });
+    } catch (e) {
+      setAuthStatus('Unable to reach auth service. Please try again.', true);
+      return;
+    } finally {
+      button.disabled = false;
+    }
 
     if (!response.ok) {
       let message = 'Unable to send magic link.';
