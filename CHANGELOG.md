@@ -93,3 +93,10 @@
 - Add Render Blueprint `render.yaml` with Python web service defaults, `frankfurt` region, and `autoDeploy` enabled.
 - Declare Render environment variables for AI provider keys, Supabase credentials, and `DOMAIN`.
 - Update `README.md` deployment section with blueprint-based Render setup and post-deploy URL configuration steps.
+
+## v0.5.8 on 28th of February, 2026
+
+- Standardize `pyproject.toml` structure to match the shared Vaquum project template.
+- Add project metadata sections for `readme`, `authors`, `license`, optional dependencies, and project URLs.
+- Add full Ruff lint configuration blocks aligned with template defaults and set `known-first-party` to `confab`.
+- Update setuptools package discovery to template-style `find` configuration while preserving static package data.
