@@ -1,10 +1,40 @@
+import importlib
+import os
+import pathlib
 import unittest
+from typing import Any
 from unittest.mock import patch
 
+import dotenv
 import requests
 from fastapi.testclient import TestClient
 
-from confab import server
+
+def _noop_load_dotenv(*_args: Any, **_kwargs: Any) -> bool:
+    return False
+
+
+def _configure_test_environment() -> None:
+    os.environ['PYTHON_DOTENV_DISABLED'] = '1'
+    dotenv.load_dotenv = _noop_load_dotenv
+
+    os.environ['ANTHROPIC_API_KEY'] = 'test-key'
+    os.environ['OPENAI_API_KEY'] = 'test-key'
+    os.environ['XAI_API_KEY'] = 'test-key'
+    os.environ['GEMINI_API_KEY'] = 'test-key'
+    os.environ['SUPABASE_URL'] = 'https://supabase.test'
+    os.environ['SUPABASE_ANON_KEY'] = 'test-anon-key'
+    os.environ['SUPABASE_SERVICE_ROLE_KEY'] = 'test-service-key'
+    os.environ['DOMAIN'] = 'example.com'
+
+    results_dir = pathlib.Path.cwd() / 'test-results'
+    results_dir.mkdir(parents=True, exist_ok=True)
+    db_path = results_dir / 'confab-test.sqlite3'
+    os.environ['DATABASE_URL'] = f'sqlite:///{db_path}'
+
+
+_configure_test_environment()
+server = importlib.import_module('confab.server')
 
 
 class FakeResponse:

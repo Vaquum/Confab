@@ -136,3 +136,9 @@
 - Add comprehensive backend endpoint coverage in `tests/test_api_server.py` for public routes, auth gates, magic-link delivery, settings, conversations, and mode-specific `/api/opinions` flows.
 - Add deterministic test bootstrap in `tests/run.py` with isolated environment setup for API-key, domain, Supabase, and database configuration.
 - Update `.github/workflows/pr_checks_tests.yml` to always execute `tests/run.py` so backend/API coverage runs on every pull request update.
+
+## v0.6.2 on 28th of February, 2026
+
+- Fix test hermeticity in `tests/run.py` by force-setting all test env vars and isolating `DATABASE_URL` under `test-results/` to avoid accidental non-test database usage.
+- Fix standard `unittest` robustness in `tests/test_api_server.py` by configuring test environment before importing `confab.server`.
+- Fix Playwright test artifact hygiene in `playwright.config.ts` by writing SQLite state to `test-results/confab-e2e.db` instead of repo root.

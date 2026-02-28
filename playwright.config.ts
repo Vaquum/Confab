@@ -30,7 +30,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `bash -lc "source venv/bin/activate && ANTHROPIC_API_KEY=e2e OPENAI_API_KEY=e2e XAI_API_KEY=e2e GEMINI_API_KEY=e2e SUPABASE_URL=https://e2e.supabase.local SUPABASE_ANON_KEY=e2e-anon SUPABASE_SERVICE_ROLE_KEY=e2e-service DOMAIN=example.com DATABASE_URL=sqlite:///confab-e2e.db uvicorn confab.server:app --host 127.0.0.1 --port ${port}"`,
+    command: `bash -lc "source venv/bin/activate && mkdir -p test-results && ANTHROPIC_API_KEY=e2e OPENAI_API_KEY=e2e XAI_API_KEY=e2e GEMINI_API_KEY=e2e SUPABASE_URL=https://e2e.supabase.local SUPABASE_ANON_KEY=e2e-anon SUPABASE_SERVICE_ROLE_KEY=e2e-service DOMAIN=example.com DATABASE_URL=sqlite:///test-results/confab-e2e.db uvicorn confab.server:app --host 127.0.0.1 --port ${port}"`,
     url: baseUrl,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
