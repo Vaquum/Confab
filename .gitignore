@@ -1,27 +1,36 @@
+# Secrets and local env
 .env
-.venv
-*.egg-info
-__pycache__
-**/__pycache__/
-.DS_Store
-**/.DS_Store
-TODO.md
-*.ipynb_checkpoints
-.pytest_cache
-*.ipynb
+.env.*
+!.env.example
+
+# Virtual environments
+venv/
+.venv/
+
+# Python cache and tooling
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
-dist/
+htmlcov/
+
+# Packaging/build artifacts
 build/
-*.egg
-*.pyc
-*.csv
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
 
-.idea
-.vscode
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# Local databases and runtime artifacts
+confab.db
+*.sqlite3
+*.log
 
-.cursor/
+# Editor/OS local files
+.DS_Store
+.vscode/
+.idea/
+.claude/

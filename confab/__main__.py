@@ -1,0 +1,7 @@
+"""Module entrypoint for `python -m confab`."""
+
+from .core import main
+
+
+if __name__ == '__main__':
+    main()
