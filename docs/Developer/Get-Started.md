@@ -5,6 +5,7 @@ This guide covers full local setup, auth wiring, and deployment preparation.
 ## Prerequisites
 
 - Python `3.10+`
+- Node.js `20+` and `npm`
 - A local virtual environment named `venv`
 - A Supabase project
 - A Resend account with verified sending domain/subdomain
@@ -87,6 +88,23 @@ uvicorn confab.server:app --reload
 ```
 
 Open `http://localhost:8000`.
+
+## Run End-to-End Tests
+
+Install Playwright dependencies and run the browser suite:
+
+```bash
+source venv/bin/activate
+npm install
+npx playwright install chromium
+npm run e2e
+```
+
+Notes:
+
+- The suite launches `uvicorn confab.server:app` automatically through `playwright.config.ts`.
+- Auth and data APIs are mocked inside Playwright for deterministic UI coverage.
+- Failure artifacts are written to `playwright-report/` and `test-results/`.
 
 ## Authentication Behavior
 

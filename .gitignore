@@ -17,6 +17,11 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Node and Playwright artifacts
+node_modules/
+playwright-report/
+test-results/
+
 # Packaging/build artifacts
 build/
 dist/
