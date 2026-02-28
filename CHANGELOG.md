@@ -37,3 +37,10 @@
 - Add FastAPI endpoint `POST /opinions`.
 - Add SQLite persistence for each query, model responses, and synthesis.
 - Add synthesis step where Claude combines all four model responses.
+
+## v0.4.1 on 27th of February, 2026
+
+- Add compatibility module `server.py` so `uvicorn server:app` works from project root.
+- Fix `confab/core.py` imports to support direct execution context inside `confab`.
+- Fix `confab/server.py` imports to support both package and direct execution contexts.
+- Update `confab/server.py` static asset loading to read from package resources or local `static` paths based on execution context.

@@ -2,27 +2,48 @@
 
 import json
 from importlib.resources import files
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
-from .core import (
-    get_keys,
-    parse_mode,
-    run_chat,
-    run_doc,
-    run_opinions_stream,
-    run_pr_review_stream,
-)
-from .db import (
-    init_db,
-    list_conversations,
-    get_conversation,
-    delete_conversation,
-    rename_conversation,
-    update_latest_document,
-)
+if __package__:
+    from .core import (
+        get_keys,
+        parse_mode,
+        run_chat,
+        run_doc,
+        run_opinions_stream,
+        run_pr_review_stream,
+    )
+    from .db import (
+        init_db,
+        list_conversations,
+        get_conversation,
+        delete_conversation,
+        rename_conversation,
+        update_latest_document,
+    )
+    STATIC_ROOT = files('confab').joinpath('static')
+else:
+    from core import (
+        get_keys,
+        parse_mode,
+        run_chat,
+        run_doc,
+        run_opinions_stream,
+        run_pr_review_stream,
+    )
+    from db import (
+        init_db,
+        list_conversations,
+        get_conversation,
+        delete_conversation,
+        rename_conversation,
+        update_latest_document,
+    )
+    STATIC_ROOT = Path(__file__).resolve().parent / 'static'
 
 app = FastAPI(title='Confab API')
 
@@ -32,9 +53,8 @@ if missing:
 
 init_db()
 
-PACKAGE_STATIC = files('confab').joinpath('static')
-GUI_HTML = PACKAGE_STATIC.joinpath('gui.html').read_text(encoding='utf-8')
-TYPOGRAPHY_CSS = PACKAGE_STATIC.joinpath('typography.css').read_text(encoding='utf-8')
+GUI_HTML = STATIC_ROOT.joinpath('gui.html').read_text(encoding='utf-8')
+TYPOGRAPHY_CSS = STATIC_ROOT.joinpath('typography.css').read_text(encoding='utf-8')
 
 
 class PromptRequest(BaseModel):

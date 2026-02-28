@@ -16,7 +16,10 @@ import openai
 from google import genai
 from google.genai import types
 
-from .db import init_db, save_chat, save_opinion, get_conversation
+if __package__:
+    from .db import init_db, save_chat, save_opinion, get_conversation
+else:
+    from db import init_db, save_chat, save_opinion, get_conversation
 
 load_dotenv(override=True)
 
