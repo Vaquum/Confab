@@ -44,3 +44,11 @@
 - Fix `confab/core.py` imports to support direct execution context inside `confab`.
 - Fix `confab/server.py` imports to support both package and direct execution contexts.
 - Update `confab/server.py` static asset loading to read from package resources or local `static` paths based on execution context.
+
+## v0.5.0 on 27th of February, 2026
+
+- Add email magic-link sign-in flow backed by Supabase auth in `confab/static/gui.html`.
+- Add token validation against Supabase `auth/v1/user` for all `/api/*` data endpoints in `confab/server.py`.
+- Add strict user scoping for conversation reads and writes via `opinions.user_id` in `confab/db.py`.
+- Add per-user persisted typography settings with `GET /api/settings` and `PUT /api/settings`.
+- Update core chat and streaming pipelines to pass `user_id` through all persistence calls.
