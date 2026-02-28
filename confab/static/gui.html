@@ -6,6 +6,7 @@
 <title>Confab</title>
 <link rel="stylesheet" href="/typography.css">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -41,6 +42,100 @@
   .app {
     display: flex;
     height: 100vh;
+  }
+
+  .auth-gate {
+    position: fixed;
+    inset: 0;
+    background: rgba(250, 250, 249, 0.96);
+    backdrop-filter: blur(2px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .auth-card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--bg-chat);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  }
+
+  .auth-card h2 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+
+  .auth-card p {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+
+  .auth-input {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--input-bg);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .auth-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(41, 37, 36, 0.06);
+  }
+
+  .auth-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .btn-auth {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: var(--bubble-user-text);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .btn-auth:hover {
+    background: var(--accent-hover);
+  }
+
+  .btn-auth:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .auth-status {
+    margin-top: 10px;
+    min-height: 18px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .auth-status.error {
+    color: #b91c1c;
   }
 
   /* ----- Sidebar ----- */
@@ -193,6 +288,36 @@
   .sidebar-footer {
     padding: 12px 20px;
     border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .auth-user {
+    font-size: 11px;
+    color: var(--text-faint);
+    max-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .btn-signout {
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-chat);
+    font-family: inherit;
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .btn-signout:hover {
+    background: var(--bg);
+    border-color: var(--text-muted);
   }
 
   .btn-typography {
@@ -1118,6 +1243,17 @@
 <body>
 
 <div class="app">
+  <div class="auth-gate" id="authGate" style="display:none;">
+    <div class="auth-card">
+      <h2>Sign in to Confab</h2>
+      <p>Use an email magic link. Only <code id="allowedDomainBadge">@&lt;your-domain&gt;</code> emails are allowed.</p>
+      <input class="auth-input" id="authEmail" type="email" placeholder="you@example.com" autocomplete="email">
+      <div class="auth-actions">
+        <button class="btn-auth" id="btnAuthMagicLink" onclick="sendMagicLink()">Send magic link</button>
+      </div>
+      <div class="auth-status" id="authStatus"></div>
+    </div>
+  </div>
 
   <!-- Sidebar -->
   <aside class="sidebar">
@@ -1134,9 +1270,13 @@
     </div>
     <div class="chat-list" id="chatList"></div>
     <div class="sidebar-footer">
-      <button class="btn-typography" id="btnTypography" onclick="toggleTypography()" title="Typography settings">
-        <svg viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
-      </button>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button class="btn-typography" id="btnTypography" onclick="toggleTypography()" title="Typography settings">
+          <svg viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+        </button>
+        <span class="auth-user" id="authUser"></span>
+      </div>
+      <button class="btn-signout" id="btnSignOut" onclick="signOut()" style="display:none;">Sign out</button>
     </div>
   </aside>
 
@@ -1351,15 +1491,173 @@
 </div>
 
 <script>
+  const SUPABASE_URL = __SUPABASE_URL__;
+  const SUPABASE_ANON_KEY = __SUPABASE_ANON_KEY__;
+  const ALLOWED_EMAIL_DOMAIN = __ALLOWED_EMAIL_DOMAIN__;
+  const supabaseClient = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+
   let currentConversationId = null;
   let currentMode = null;
   let loading = false;
   let sidebarCollapsed = false;
   let currentDocument = null;
   let docPaneOpen = false;
+  let authSession = null;
+  let authReady = false;
+  let typoSaveTimer = null;
+
+  function renderAllowedDomainBadge() {
+    const badge = document.getElementById('allowedDomainBadge');
+    if (!badge) return;
+    badge.textContent = `@${ALLOWED_EMAIL_DOMAIN}`;
+  }
 
   // --- Init ---
-  loadHistory();
+  renderAllowedDomainBadge();
+  initAuth();
+
+  function setAuthStatus(message, isError = false) {
+    const el = document.getElementById('authStatus');
+    if (!el) return;
+    el.textContent = message || '';
+    el.classList.toggle('error', !!isError);
+  }
+
+  function setAuthenticatedUi(isAuthenticated) {
+    document.getElementById('authGate').style.display = isAuthenticated ? 'none' : 'flex';
+    document.getElementById('btnSignOut').style.display = isAuthenticated ? 'inline-flex' : 'none';
+    document.getElementById('authUser').textContent = isAuthenticated ? (authSession?.user?.email || 'Signed in') : '';
+    document.getElementById('input').disabled = !isAuthenticated;
+    document.getElementById('btnSend').disabled = !isAuthenticated;
+  }
+
+  async function initAuth() {
+    if (!supabaseClient) {
+      setAuthenticatedUi(false);
+      setAuthStatus('Supabase auth is not configured on the server.', true);
+      return;
+    }
+
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) {
+      setAuthenticatedUi(false);
+      setAuthStatus('Failed to initialize authentication.', true);
+      return;
+    }
+
+    authSession = data.session;
+    authReady = true;
+    setAuthenticatedUi(!!authSession);
+
+    if (authSession) {
+      await initTypography();
+      await loadHistory();
+    } else {
+      renderHistory([]);
+    }
+
+    supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+      authSession = session;
+      setAuthenticatedUi(!!session);
+
+      if (session) {
+        setAuthStatus('');
+        await initTypography();
+        await loadHistory();
+      } else {
+        currentConversationId = null;
+        currentMode = null;
+        currentDocument = null;
+        document.getElementById('messageContainer').innerHTML = '';
+        document.getElementById('messages').style.display = 'none';
+        document.getElementById('welcome').style.display = 'flex';
+        renderHistory([]);
+      }
+    });
+  }
+
+  async function sendMagicLink() {
+    if (!supabaseClient) {
+      setAuthStatus('Supabase auth is not configured on the server.', true);
+      return;
+    }
+
+    const email = document.getElementById('authEmail').value.trim();
+    if (!email) {
+      setAuthStatus('Enter an email address.', true);
+      return;
+    }
+    if (email.toLowerCase().split('@')[1] !== ALLOWED_EMAIL_DOMAIN) {
+      setAuthStatus(`Only @${ALLOWED_EMAIL_DOMAIN} emails are allowed.`, true);
+      return;
+    }
+
+    const button = document.getElementById('btnAuthMagicLink');
+    button.disabled = true;
+    setAuthStatus('Sending magic link...');
+    let response = null;
+    try {
+      response = await fetch('/api/auth/magic-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          email_redirect_to: window.location.origin,
+        }),
+      });
+    } catch (e) {
+      setAuthStatus('Unable to reach auth service. Please try again.', true);
+      return;
+    } finally {
+      button.disabled = false;
+    }
+
+    if (!response.ok) {
+      let message = 'Unable to send magic link.';
+      try {
+        const payload = await response.json();
+        message = payload.detail || message;
+      } catch (e) {
+        message = 'Unable to send magic link.';
+      }
+      setAuthStatus(message, true);
+      return;
+    }
+    setAuthStatus('Check your email for the sign-in link.');
+  }
+
+  async function signOut() {
+    if (!supabaseClient) return;
+    await supabaseClient.auth.signOut();
+  }
+
+  async function getAuthToken() {
+    if (!supabaseClient) return null;
+    if (!authSession) return null;
+    return authSession.access_token;
+  }
+
+  async function apiFetch(url, options = {}) {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('You must sign in first.');
+    }
+    const headers = Object.assign({}, options.headers || {}, {
+      Authorization: `Bearer ${token}`,
+    });
+    const response = await fetch(url, Object.assign({}, options, { headers }));
+    if (response.status === 401) {
+      await signOut();
+      throw new Error('Session expired. Please sign in again.');
+    }
+    if (response.status === 403) {
+      await signOut();
+      throw new Error(`Only @${ALLOWED_EMAIL_DOMAIN} emails are allowed.`);
+    }
+    return response;
+  }
 
   // --- Sidebar toggle ---
   function toggleSidebar() {
@@ -1382,8 +1680,12 @@
 
   // --- History ---
   async function loadHistory() {
+    if (!authReady || !authSession) {
+      renderHistory([]);
+      return;
+    }
     try {
-      const res = await fetch("/api/opinions");
+      const res = await apiFetch("/api/opinions");
       const data = await res.json();
       renderHistory(data);
     } catch (e) {
@@ -1417,7 +1719,7 @@
   // --- Load conversation ---
   async function loadConversation(conversationId) {
     try {
-      const res = await fetch(`/api/conversations/${conversationId}`);
+      const res = await apiFetch(`/api/conversations/${conversationId}`);
       if (!res.ok) return;
       const data = await res.json();
 
@@ -1465,7 +1767,7 @@
   // --- Delete chat ---
   async function deleteChat(conversationId) {
     try {
-      await fetch(`/api/conversations/${conversationId}`, { method: "DELETE" });
+      await apiFetch(`/api/conversations/${conversationId}`, { method: "DELETE" });
       if (currentConversationId === conversationId) newChat();
       else loadHistory();
     } catch (e) {
@@ -1491,7 +1793,7 @@
       const title = el.textContent.trim();
       if (!title) { loadHistory(); return; }
       try {
-        await fetch(`/api/conversations/${conversationId}`, {
+        await apiFetch(`/api/conversations/${conversationId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title }),
@@ -1795,7 +2097,7 @@
   async function saveDocumentEdit() {
     if (!currentConversationId || !currentDocument) return;
     try {
-      await fetch(`/api/conversations/${currentConversationId}/document`, {
+      await apiFetch(`/api/conversations/${currentConversationId}/document`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ document: currentDocument }),
@@ -1882,7 +2184,7 @@
   async function send() {
     const input = document.getElementById("input");
     const prompt = input.value.trim();
-    if (!prompt || loading) return;
+    if (!prompt || loading || !authSession) return;
 
     // Explicit @prefix wins, otherwise inherit last mode, default to chat
     const detected = detectMode(prompt);
@@ -1936,7 +2238,7 @@
     msgs.scrollTop = msgs.scrollHeight;
 
     try {
-      const res = await fetch("/api/opinions", {
+      const res = await apiFetch("/api/opinions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2159,7 +2461,10 @@
     applyTypography(s);
     updateValueDisplays();
     updateSliderFills();
-    saveTypoSettings(s);
+    clearTimeout(typoSaveTimer);
+    typoSaveTimer = setTimeout(() => {
+      saveTypoSettings(s);
+    }, 250);
   }
 
   function readTypoInputs() {
@@ -2254,31 +2559,46 @@
     slider.style.background = "linear-gradient(to right, var(--text-muted) " + pct + "%, var(--border) " + pct + "%)";
   }
 
-  function saveTypoSettings(s) {
-    localStorage.setItem("confab-typography", JSON.stringify(s));
+  async function saveTypoSettings(s) {
+    if (!authSession) return;
+    try {
+      await apiFetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: s }),
+      });
+    } catch (e) {
+      console.error('Failed to save settings', e);
+    }
   }
 
-  function loadTypoSettings() {
+  async function loadTypoSettings() {
+    if (!authSession) {
+      return Object.assign({}, TYPO_DEFAULTS);
+    }
     try {
-      const saved = localStorage.getItem("confab-typography");
-      return saved ? Object.assign({}, TYPO_DEFAULTS, JSON.parse(saved)) : Object.assign({}, TYPO_DEFAULTS);
+      const res = await apiFetch('/api/settings');
+      if (!res.ok) {
+        return Object.assign({}, TYPO_DEFAULTS);
+      }
+      const data = await res.json();
+      return Object.assign({}, TYPO_DEFAULTS, data.settings || {});
     } catch (e) {
       return Object.assign({}, TYPO_DEFAULTS);
     }
   }
 
   function resetTypography() {
-    localStorage.removeItem("confab-typography");
     populateTypoInputs(TYPO_DEFAULTS);
     applyTypography(TYPO_DEFAULTS);
+    saveTypoSettings(TYPO_DEFAULTS);
   }
 
-  // Init typography on page load
-  (function initTypography() {
-    const settings = loadTypoSettings();
+  async function initTypography() {
+    const settings = await loadTypoSettings();
     applyTypography(settings);
     populateTypoInputs(settings);
-  })();
+  }
 </script>
 
 </body>

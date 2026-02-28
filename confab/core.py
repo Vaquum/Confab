@@ -121,11 +121,11 @@ def query_gemini(api_key, messages):
 
 # --- History ---
 
-def build_history(conversation_id, mode=None):
+def build_history(conversation_id, mode=None, user_id='cli-local'):
     """Load existing conversation turns as a message list."""
     if not conversation_id:
         return []
-    conv = get_conversation(conversation_id)
+    conv = get_conversation(user_id, conversation_id)
     if not conv:
         return []
 
@@ -231,17 +231,17 @@ _QUERY_MAP = {
 }
 
 
-def run_chat(prompt, keys, conversation_id=None, mode='chat'):
+def run_chat(prompt, keys, conversation_id=None, mode='chat', user_id='cli-local'):
     if not conversation_id:
         conversation_id = str(uuid.uuid4())
 
-    history = build_history(conversation_id, mode)
+    history = build_history(conversation_id, mode, user_id=user_id)
     messages = history + [{'role': 'user', 'content': prompt}]
     position = len(history) // 2
 
     key_name, query_fn = _QUERY_MAP[mode]
     response, usage = query_fn(keys[key_name], messages)
-    save_chat(conversation_id, position, prompt, response, mode=mode,
+    save_chat(user_id, conversation_id, position, prompt, response, mode=mode,
               input_tokens=usage.get('input'), output_tokens=usage.get('output'))
     return response, conversation_id
 
@@ -279,12 +279,12 @@ CRITICAL RULES FOR EDITS:
 - Prefer fewer, larger edits over many tiny ones. Group related changes together."""
 
 
-def build_doc_history(conversation_id):
+def build_doc_history(conversation_id, user_id='cli-local'):
     """Build message history for doc mode, embedding document context."""
     import json as _json
     if not conversation_id:
         return []
-    conv = get_conversation(conversation_id)
+    conv = get_conversation(user_id, conversation_id)
     if not conv:
         return []
 
@@ -302,7 +302,7 @@ def build_doc_history(conversation_id):
     return history
 
 
-def run_doc(prompt, keys, conversation_id=None, document=None):
+def run_doc(prompt, keys, conversation_id=None, document=None, user_id='cli-local'):
     """Run a document editing turn.
 
     Returns dict with keys:
@@ -316,7 +316,7 @@ def run_doc(prompt, keys, conversation_id=None, document=None):
     if not conversation_id:
         conversation_id = str(uuid.uuid4())
 
-    history = build_doc_history(conversation_id)
+    history = build_doc_history(conversation_id, user_id=user_id)
 
     # Build current turn's user message
     user_content = prompt
@@ -361,14 +361,14 @@ def run_doc(prompt, keys, conversation_id=None, document=None):
     if 'edits' in parsed:
         # Surgical edit mode — don't save document yet (user must approve)
         result['edits'] = parsed['edits']
-        save_chat(conversation_id, position, prompt, chat_response, mode='doc',
+        save_chat(user_id, conversation_id, position, prompt, chat_response, mode='doc',
                   input_tokens=usage.get('input'), output_tokens=usage.get('output'),
                   document=document)  # preserve current doc
     else:
         # Full document mode (creation or full rewrite)
         doc_content = parsed.get('document', raw_text)
         result['document'] = doc_content
-        save_chat(conversation_id, position, prompt, chat_response, mode='doc',
+        save_chat(user_id, conversation_id, position, prompt, chat_response, mode='doc',
                   input_tokens=usage.get('input'), output_tokens=usage.get('output'),
                   document=doc_content)
 
@@ -386,11 +386,11 @@ def get_keys():
     return keys, missing
 
 
-def run_opinions(prompt, keys, conversation_id=None, mode='consensus'):
+def run_opinions(prompt, keys, conversation_id=None, mode='consensus', user_id='cli-local'):
     if not conversation_id:
         conversation_id = str(uuid.uuid4())
 
-    history = build_history(conversation_id, mode)
+    history = build_history(conversation_id, mode, user_id=user_id)
     messages = history + [{'role': 'user', 'content': prompt}]
     position = len(history) // 2
 
@@ -419,7 +419,7 @@ def run_opinions(prompt, keys, conversation_id=None, mode='consensus'):
             responses[name] = f'[Error: {errors[name]}]'
 
     result, synthesis_usage = synthesize(keys['claude'], prompt, responses, history, mode=mode)
-    save_opinion(conversation_id, position, prompt, responses, result,
+    save_opinion(user_id, conversation_id, position, prompt, responses, result,
                  usages=usages, synthesis_usage=synthesis_usage, mode=mode)
     return result, responses, errors, conversation_id
 
@@ -515,19 +515,19 @@ def fetch_pr(url):
     )
 
 
-def run_pr_review(url, keys, conversation_id=None):
+def run_pr_review(url, keys, conversation_id=None, user_id='cli-local'):
     """Fetch a GitHub PR and run a multi-model consensus code review."""
     pr_content = fetch_pr(url)
     review_prompt = _PR_REVIEW_PROMPT + pr_content
-    return run_opinions(review_prompt, keys, conversation_id, mode='pr')
+    return run_opinions(review_prompt, keys, conversation_id, mode='pr', user_id=user_id)
 
 
-def run_opinions_stream(prompt, keys, conversation_id=None, mode='consensus'):
+def run_opinions_stream(prompt, keys, conversation_id=None, mode='consensus', user_id='cli-local'):
     """Generator yielding progress events, then the final result."""
     if not conversation_id:
         conversation_id = str(uuid.uuid4())
 
-    history = build_history(conversation_id, mode)
+    history = build_history(conversation_id, mode, user_id=user_id)
     messages = history + [{'role': 'user', 'content': prompt}]
     position = len(history) // 2
 
@@ -562,7 +562,7 @@ def run_opinions_stream(prompt, keys, conversation_id=None, mode='consensus'):
     yield {'event': 'synthesizing'}
     result, synthesis_usage = synthesize(keys['claude'], prompt, responses, history, mode=mode)
 
-    save_opinion(conversation_id, position, prompt, responses, result,
+    save_opinion(user_id, conversation_id, position, prompt, responses, result,
                  usages=usages, synthesis_usage=synthesis_usage, mode=mode)
 
     yield {
@@ -575,13 +575,13 @@ def run_opinions_stream(prompt, keys, conversation_id=None, mode='consensus'):
     }
 
 
-def run_pr_review_stream(url, keys, conversation_id=None):
+def run_pr_review_stream(url, keys, conversation_id=None, user_id='cli-local'):
     """Fetch a GitHub PR and stream a multi-model review with progress."""
     yield {'event': 'fetching_pr'}
     pr_content = fetch_pr(url)
     yield {'event': 'pr_fetched'}
     review_prompt = _PR_REVIEW_PROMPT + pr_content
-    yield from run_opinions_stream(review_prompt, keys, conversation_id, mode='pr')
+    yield from run_opinions_stream(review_prompt, keys, conversation_id, mode='pr', user_id=user_id)
 
 
 # --- CLI ---
@@ -599,7 +599,7 @@ def main():
     init_db()
 
     print('Querying all models...', file=sys.stderr)
-    result, responses, errors, _ = run_opinions(args.prompt, keys)
+    result, responses, errors, _ = run_opinions(args.prompt, keys, user_id='cli-local')
 
     if errors:
         print(f"\n{len(errors)} model(s) failed: {', '.join(errors.keys())}", file=sys.stderr)

@@ -1,5 +1,6 @@
 """Database models and helpers."""
 
+import json
 import os
 import uuid
 from datetime import datetime, timezone
@@ -44,6 +45,7 @@ class Opinion(Base):
     __tablename__ = 'opinions'
 
     id = Column(Integer, primary_key=True)
+    user_id = Column(String, nullable=False, index=True)
     conversation_id = Column(String, nullable=False, index=True)
     position = Column(Integer, nullable=False, default=0)
     mode = Column(String, nullable=False, default='chat')
@@ -72,6 +74,15 @@ class Opinion(Base):
     # Token tracking — consensus synthesis
     synthesis_input_tokens = Column(Integer)
     synthesis_output_tokens = Column(Integer)
+
+
+class UserSetting(Base):
+    __tablename__ = 'user_settings'
+
+    user_id = Column(String, primary_key=True)
+    settings = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc),
+                        onupdate=lambda: datetime.now(timezone.utc))
 
 
 def _migrate_db():
@@ -140,19 +151,42 @@ def _migrate_document():
         conn.execute(text('ALTER TABLE opinions ADD COLUMN document TEXT'))
 
 
+def _migrate_user_id():
+    """Add user_id column if missing and backfill legacy rows."""
+    insp = inspect(engine)
+    if 'opinions' not in insp.get_table_names():
+        return
+    columns = [c['name'] for c in insp.get_columns('opinions')]
+    with engine.begin() as conn:
+        if 'user_id' not in columns:
+            conn.execute(text('ALTER TABLE opinions ADD COLUMN user_id TEXT'))
+        conn.execute(text("UPDATE opinions SET user_id = 'legacy-local' WHERE user_id IS NULL"))
+        if engine.dialect.name == 'postgresql':
+            conn.execute(text('ALTER TABLE opinions ALTER COLUMN user_id SET NOT NULL'))
+        conn.execute(text('CREATE INDEX IF NOT EXISTS ix_opinions_user_id ON opinions (user_id)'))
+        conn.execute(
+            text(
+                'CREATE INDEX IF NOT EXISTS ix_opinions_user_conversation '
+                'ON opinions (user_id, conversation_id)'
+            )
+        )
+
+
 def init_db():
     Base.metadata.create_all(engine)
     _migrate_db()
     _migrate_title()
     _migrate_tokens()
     _migrate_document()
+    _migrate_user_id()
 
 
-def save_chat(conversation_id, position, prompt, response, mode='chat',
+def save_chat(user_id, conversation_id, position, prompt, response, mode='chat',
               input_tokens=None, output_tokens=None, document=None):
     session = Session()
     try:
         row = Opinion(
+            user_id=user_id,
             conversation_id=conversation_id,
             position=position,
             mode=mode,
@@ -169,13 +203,14 @@ def save_chat(conversation_id, position, prompt, response, mode='chat',
         session.close()
 
 
-def save_opinion(conversation_id, position, prompt, responses, synthesis,
+def save_opinion(user_id, conversation_id, position, prompt, responses, synthesis,
                  usages=None, synthesis_usage=None, mode='consensus'):
     usages = usages or {}
     synthesis_usage = synthesis_usage or {}
     session = Session()
     try:
         row = Opinion(
+            user_id=user_id,
             conversation_id=conversation_id,
             position=position,
             mode=mode,
@@ -203,13 +238,13 @@ def save_opinion(conversation_id, position, prompt, responses, synthesis,
         session.close()
 
 
-def list_conversations():
+def list_conversations(user_id):
     """Return one entry per conversation: first prompt as title, latest timestamp."""
     session = Session()
     try:
         rows = (
             session.query(Opinion)
-            .filter(Opinion.position == 0)
+            .filter(Opinion.user_id == user_id, Opinion.position == 0)
             .order_by(Opinion.created_at.desc())
             .all()
         )
@@ -227,13 +262,17 @@ def list_conversations():
         session.close()
 
 
-def rename_conversation(conversation_id, title):
+def rename_conversation(user_id, conversation_id, title):
     """Set a custom title on a conversation (stored on position=0 row)."""
     session = Session()
     try:
         row = (
             session.query(Opinion)
-            .filter(Opinion.conversation_id == conversation_id, Opinion.position == 0)
+            .filter(
+                Opinion.user_id == user_id,
+                Opinion.conversation_id == conversation_id,
+                Opinion.position == 0,
+            )
             .first()
         )
         if row:
@@ -243,11 +282,12 @@ def rename_conversation(conversation_id, title):
         session.close()
 
 
-def delete_conversation(conversation_id):
+def delete_conversation(user_id, conversation_id):
     """Delete all messages in a conversation."""
     session = Session()
     try:
         session.query(Opinion).filter(
+            Opinion.user_id == user_id,
             Opinion.conversation_id == conversation_id
         ).delete()
         session.commit()
@@ -255,13 +295,13 @@ def delete_conversation(conversation_id):
         session.close()
 
 
-def get_conversation(conversation_id):
+def get_conversation(user_id, conversation_id):
     """Return all messages in a conversation, ordered by position."""
     session = Session()
     try:
         rows = (
             session.query(Opinion)
-            .filter(Opinion.conversation_id == conversation_id)
+            .filter(Opinion.user_id == user_id, Opinion.conversation_id == conversation_id)
             .order_by(Opinion.position)
             .all()
         )
@@ -296,18 +336,49 @@ def get_conversation(conversation_id):
         session.close()
 
 
-def update_latest_document(conversation_id, document):
+def update_latest_document(user_id, conversation_id, document):
     """Update the document content on the latest turn of a conversation."""
     session = Session()
     try:
         row = (
             session.query(Opinion)
-            .filter(Opinion.conversation_id == conversation_id)
+            .filter(Opinion.user_id == user_id, Opinion.conversation_id == conversation_id)
             .order_by(Opinion.position.desc())
             .first()
         )
         if row:
             row.document = document
             session.commit()
+    finally:
+        session.close()
+
+
+def get_user_settings(user_id):
+    """Return user settings as dict."""
+    session = Session()
+    try:
+        row = session.query(UserSetting).filter(UserSetting.user_id == user_id).first()
+        if not row:
+            return None
+        try:
+            return json.loads(row.settings)
+        except json.JSONDecodeError:
+            return None
+    finally:
+        session.close()
+
+
+def save_user_settings(user_id, settings):
+    """Persist user settings."""
+    session = Session()
+    try:
+        payload = json.dumps(settings)
+        row = session.query(UserSetting).filter(UserSetting.user_id == user_id).first()
+        if row:
+            row.settings = payload
+        else:
+            row = UserSetting(user_id=user_id, settings=payload)
+            session.add(row)
+        session.commit()
     finally:
         session.close()
