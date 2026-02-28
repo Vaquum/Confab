@@ -26,7 +26,6 @@ jobs:
           pip install -e .
 
       - name: Run repository tests (verbose)
-        if: ${{ hashFiles('tests/run.py') != '' }}
         run: |
           set -x
           python -u tests/run.py

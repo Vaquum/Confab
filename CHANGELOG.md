@@ -130,3 +130,9 @@
 - Add reusable network mocks for Supabase auth and `/api/*` flows in `e2e/support/` to cover full GUI interaction paths without app-code changes.
 - Add CI workflow `.github/workflows/pr_checks_playwright.yml` to run Playwright in pull requests and upload failure artifacts.
 - Add Node/Playwright ignore rules to `.gitignore` and document local e2e execution in `docs/Developer/Get-Started.md`.
+
+## v0.6.1 on 28th of February, 2026
+
+- Add comprehensive backend endpoint coverage in `tests/test_api_server.py` for public routes, auth gates, magic-link delivery, settings, conversations, and mode-specific `/api/opinions` flows.
+- Add deterministic test bootstrap in `tests/run.py` with isolated environment setup for API-key, domain, Supabase, and database configuration.
+- Update `.github/workflows/pr_checks_tests.yml` to always execute `tests/run.py` so backend/API coverage runs on every pull request update.
