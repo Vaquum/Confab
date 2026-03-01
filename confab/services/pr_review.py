@@ -23,6 +23,7 @@ Be exhaustive. Finding every real issue matters more than being concise. If ther
 """
 
 GITHUB_HEADERS = {'Accept': 'application/vnd.github.v3+json'}
+GITHUB_REQUEST_TIMEOUT_SECONDS = 10
 
 
 def _compact_patch(patch):
@@ -46,7 +47,11 @@ def fetch_pr(url):
     owner, repo, number = match.groups()
     api_base = f'https://api.github.com/repos/{owner}/{repo}/pulls/{number}'
 
-    pr_response = requests.get(api_base, headers=GITHUB_HEADERS)
+    pr_response = requests.get(
+        api_base,
+        headers=GITHUB_HEADERS,
+        timeout=GITHUB_REQUEST_TIMEOUT_SECONDS,
+    )
     pr_response.raise_for_status()
     pr = pr_response.json()
 
@@ -57,6 +62,7 @@ def fetch_pr(url):
             f'{api_base}/files',
             headers=GITHUB_HEADERS,
             params={'per_page': 100, 'page': page},
+            timeout=GITHUB_REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         batch = response.json()

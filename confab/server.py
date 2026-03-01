@@ -136,7 +136,7 @@ def _extract_doc_plus_user_prompt(prompt: str | None) -> str:
         return prompt
     user_prompt = prompt.split(DOC_PLUS_USER_PROMPT_HEADER, maxsplit=1)[1].strip()
     if not user_prompt:
-        return prompt
+        return ''
     return user_prompt
 
 

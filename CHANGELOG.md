@@ -248,3 +248,12 @@
 
 - Replace the doc-plus background context in `frontend/src/main.ts` with the full style framework text and 30-attribute table content from `style.md` for stronger contrast and instruction richness in model-facing context.
 - Keep existing doc-plus selected-profile injection and persistence behavior unchanged while enriching baseline context.
+
+## v0.7.16 on 1st of March, 2026
+
+- Fix CI quality gating in `.github/workflows/pr_checks_quality.yml` by installing `ruff` alongside `pyright` before lint/type steps.
+- Fix potential hangs in `confab/services/pr_review.py` by applying explicit request timeouts to all GitHub API fetch calls.
+- Fix doc-plus edit prompt wrapping in `confab/services/documents.py` by avoiding duplicate `User request:` labels when a fully-formed `model_prompt` is provided.
+- Fix doc-plus wrapper leakage in `confab/server.py` by returning an empty display prompt when internal wrapper payload is malformed or empty.
+- Add regression coverage in `tests/test_api_server.py` to verify empty wrapped doc-plus prompts are never exposed back to API clients.
+- Harden `e2e/check-core-paths.mjs` parsing to accept both single- and double-quoted values in `e2e/core-paths.ts`.

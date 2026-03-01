@@ -595,6 +595,24 @@ class ApiServerTestCase(unittest.TestCase):
             'Visible user prompt',
         )
 
+    def test_get_conversation_masks_empty_doc_plus_user_prompt(self):
+        self._set_auth_override()
+        wrapped_prompt = (
+            f'{server.DOC_PLUS_CONTEXT_HEADER}\n'
+            'Profile\n'
+            f'{server.DOC_PLUS_CONTEXT_FOOTER}\n'
+            f'{server.DOC_PLUS_USER_PROMPT_HEADER}\n'
+        )
+        conversation = {
+            'conversation_id': 'c-1',
+            'mode': 'doc_plus',
+            'messages': [{'mode': 'doc_plus', 'prompt': wrapped_prompt, 'response': 'ok'}],
+        }
+        with patch.object(server, 'get_conversation', return_value=conversation):
+            response = self.client.get('/api/conversations/c-1')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['messages'][0]['prompt'], '')
+
     def test_post_opinions_consensus_returns_sse_stream(self):
         self._set_auth_override()
         events = [

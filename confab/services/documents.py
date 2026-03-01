@@ -58,8 +58,13 @@ def run_doc(
     prompt_for_model = model_prompt if model_prompt is not None else prompt
     user_content = prompt_for_model
     if document:
+        request_payload = (
+            prompt_for_model
+            if model_prompt is not None
+            else f'User request: {prompt_for_model}'
+        )
         user_content = (
-            f'Current document:\n\n{document}\n\n---\n\nUser request: {prompt_for_model}'
+            f'Current document:\n\n{document}\n\n---\n\n{request_payload}'
         )
 
     messages = history + [{'role': 'user', 'content': user_content}]

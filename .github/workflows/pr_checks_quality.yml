@@ -30,7 +30,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install -e .
-          pip install pyright
+          pip install pyright ruff
 
       - name: Install Node dependencies
         run: npm ci

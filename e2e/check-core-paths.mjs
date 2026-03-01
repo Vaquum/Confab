@@ -36,8 +36,8 @@ function extractArrayBlock(source, marker) {
   throw new Error(`Unclosed array block for marker: ${marker}`);
 }
 
-function extractSingleQuotedValues(block, key) {
-  const regex = new RegExp(`${key}\\s*:\\s*'([^']+)'`, 'g');
+function extractQuotedValues(block, key) {
+  const regex = new RegExp(`${key}\\s*:\\s*(['"])([^'"]+)\\1`, 'g');
   const values = [];
   let match;
   while (true) {
@@ -45,7 +45,7 @@ function extractSingleQuotedValues(block, key) {
     if (!match) {
       break;
     }
-    values.push(match[1]);
+    values.push(match[2]);
   }
   return values;
 }
@@ -80,12 +80,12 @@ function main() {
   const corePathsBlock = extractArrayBlock(source, 'export const CORE_PATHS');
   const modeMatrixBlock = extractArrayBlock(source, 'export const MODE_MATRIX_CASES');
 
-  const corePathIds = extractSingleQuotedValues(corePathsBlock, 'id');
-  const corePathSpecs = extractSingleQuotedValues(corePathsBlock, 'ownerSpec');
-  const corePathDescriptions = extractSingleQuotedValues(corePathsBlock, 'description');
+  const corePathIds = extractQuotedValues(corePathsBlock, 'id');
+  const corePathSpecs = extractQuotedValues(corePathsBlock, 'ownerSpec');
+  const corePathDescriptions = extractQuotedValues(corePathsBlock, 'description');
 
-  const matrixCaseIds = extractSingleQuotedValues(modeMatrixBlock, 'id');
-  const matrixPrompts = extractSingleQuotedValues(modeMatrixBlock, 'prompt');
+  const matrixCaseIds = extractQuotedValues(modeMatrixBlock, 'id');
+  const matrixPrompts = extractQuotedValues(modeMatrixBlock, 'prompt');
 
   const errors = [];
 
