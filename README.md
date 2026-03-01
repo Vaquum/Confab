@@ -44,7 +44,16 @@ source venv/bin/activate
 python -m confab "Compare the strategic pros and cons of launching this week vs next week."
 ```
 
+If you change files under `frontend/src/`, rebuild shipped browser assets:
+
+```bash
+source venv/bin/activate
+npm install
+npm run check:frontend
+```
+
 For complete setup, API auth flow, and deployment instructions, see [Get Started](docs/Developer/Get-Started.md).
+For internal module boundaries after the refactor, see [Architecture](docs/Developer/Architecture.md).
 
 # Contributing
 

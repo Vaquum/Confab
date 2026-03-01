@@ -1,0 +1,45 @@
+name: Quality Gates
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  pr_checks_quality:
+    name: PR Checks Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Python dependencies
+        run: |
+          pip install -e .
+          pip install pyright
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Run Python compile, lint, and type checks
+        run: |
+          python -m compileall confab tests
+          ruff check confab tests
+          pyright confab/config confab/providers confab/services confab/core.py
+
+      - name: Run frontend typecheck and build
+        run: npm run check:frontend

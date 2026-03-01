@@ -2,6 +2,14 @@
 
 This guide covers full local setup, auth wiring, and deployment preparation.
 
+## Developer Docs Map
+
+- Setup and runtime: `docs/Developer/Get-Started.md`
+- HTTP contracts: `docs/Developer/API-Reference.md`
+- CLI behavior: `docs/Developer/CLI.md`
+- Refactor architecture boundaries: `docs/Developer/Architecture.md`
+- Feature-change e2e policy: `docs/Developer/E2E-Policy.md`
+
 ## Prerequisites
 
 - Python `3.10+`
@@ -43,6 +51,12 @@ Notes:
 - `SUPABASE_URL` + `SUPABASE_ANON_KEY` are injected into the frontend.
 - `SUPABASE_SERVICE_ROLE_KEY` is used for backend-triggered magic-link requests.
 - `DOMAIN` controls login domain restriction in backend and UI.
+- Optional Gemini tuning env vars:
+  - `GEMINI_MAX_OUTPUT_TOKENS` (default `2048`)
+  - `GEMINI_THINKING_BUDGET` (default `512`)
+  - `GEMINI_INCLUDE_THOUGHTS` (default `false`)
+  - `GEMINI_TIMEOUT_SECONDS` (default `45`)
+- On Gemini timeout, Confab retries once with the same model using no thinking and a reduced token cap.
 
 ## Supabase Setup
 
@@ -89,6 +103,32 @@ uvicorn confab.server:app --reload
 
 Open `http://localhost:8000`.
 
+Alternative package-local startup (when your shell is inside `confab/`):
+
+```bash
+source ../venv/bin/activate
+uvicorn server:app --reload
+```
+
+## Frontend Modular Workflow
+
+Frontend logic lives in `frontend/src/` and is bundled to `confab/static/app/` with Vite.
+
+Use these commands after changing frontend source:
+
+```bash
+source venv/bin/activate
+npm install
+npm run check:frontend
+```
+
+Notes:
+
+- `npm run typecheck:frontend` runs TypeScript checks.
+- `npm run build:frontend` emits `gui.js` and `gui.css` into `confab/static/app/`.
+- `confab/static/gui.html` is now a thin shell that loads `/app/gui.js` and `/app/gui.css`.
+- `confab/static/app/` is generated output; edit source in `frontend/src/` instead.
+
 ## Run End-to-End Tests
 
 Install Playwright dependencies and run the browser suite:
@@ -105,6 +145,32 @@ Notes:
 - The suite launches `uvicorn confab.server:app` automatically through `playwright.config.ts`.
 - Auth and data APIs are mocked inside Playwright for deterministic UI coverage.
 - Failure artifacts are written to `playwright-report/` and `test-results/`.
+
+Run policy and mode-smoke checks explicitly:
+
+```bash
+source venv/bin/activate
+npm run e2e:policy
+npm run e2e:matrix
+```
+
+## Run Full Quality Gates
+
+```bash
+source venv/bin/activate
+python -m compileall confab tests
+ruff check confab tests
+pyright confab/config confab/providers confab/services confab/core.py
+npm run check:frontend
+python tests/run.py
+npm run e2e
+```
+
+CI runs these checks in workflows:
+
+- `.github/workflows/pr_checks_quality.yml`
+- `.github/workflows/pr_checks_tests.yml`
+- `.github/workflows/pr_checks_playwright.yml`
 
 ## Authentication Behavior
 
@@ -123,7 +189,7 @@ Blueprint defaults:
 - Region: `frankfurt`
 - Auto deploy: enabled
 - Runtime: Python `3.10.14`
-- Build command: `pip install -e .`
+- Build command: `pip install -e . && python -m compileall confab`
 - Start command: `uvicorn confab.server:app --host 0.0.0.0 --port $PORT`
 
 Deploy with blueprint:

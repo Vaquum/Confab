@@ -1,4 +1,5 @@
 import importlib
+import json
 import os
 import pathlib
 import unittest
@@ -64,6 +65,16 @@ class ApiServerTestCase(unittest.TestCase):
     def _auth_headers() -> dict[str, str]:
         return {'Authorization': 'Bearer test-token'}
 
+    @staticmethod
+    def _parse_sse_events(body: str) -> list[dict[str, Any]]:
+        events: list[dict[str, Any]] = []
+        for line in body.splitlines():
+            if not line.startswith('data: '):
+                continue
+            payload = line[len('data: '):]
+            events.append(json.loads(payload))
+        return events
+
     def _set_auth_override(self, user_id='user-1'):
         server.app.dependency_overrides[server.get_current_user] = lambda: {
             'id': user_id,
@@ -81,6 +92,12 @@ class ApiServerTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('text/css', response.headers.get('content-type', ''))
         self.assertIn(':root', response.text)
+
+    def test_get_gui_asset_returns_javascript(self):
+        response = self.client.get('/app/gui.js')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('javascript', response.headers.get('content-type', ''))
+        self.assertIn('__CONFAB_CONFIG__', response.text)
 
     def test_magic_link_returns_ok_on_success(self):
         email = f'user@{server.ALLOWED_EMAIL_DOMAIN}'
@@ -348,6 +365,20 @@ class ApiServerTestCase(unittest.TestCase):
         self.assertEqual(response.json(), {'ok': True})
         update_mock.assert_called_once_with('user-1', 'c-1', '# Updated')
 
+    def test_put_document_allows_doc_plus_mode(self):
+        self._set_auth_override()
+        with (
+            patch.object(server, 'get_conversation', return_value={'mode': 'doc_plus'}),
+            patch.object(server, 'update_latest_document') as update_mock,
+        ):
+            response = self.client.put(
+                '/api/conversations/c-1/document',
+                json={'document': '# Updated'},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'ok': True})
+        update_mock.assert_called_once_with('user-1', 'c-1', '# Updated')
+
     def test_get_settings_returns_empty_dict_when_missing(self):
         self._set_auth_override()
         with patch.object(server, 'get_user_settings', return_value=None):
@@ -463,6 +494,107 @@ class ApiServerTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.json()['detail'], 'doc failed')
 
+    def test_post_opinions_doc_plus_requires_profile_for_first_turn(self):
+        self._set_auth_override()
+        with patch.object(server, 'run_doc') as run_doc_mock:
+            response = self.client.post('/api/opinions', json={'prompt': '/doc+ Draft this'})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['detail'], 'doc+ profile is required')
+        run_doc_mock.assert_not_called()
+
+    def test_post_opinions_doc_plus_uses_profile_context(self):
+        self._set_auth_override()
+        profile = 'Profile context'
+        run_doc_payload = {
+            'chat': 'Document created.',
+            'conversation_id': 'docp-1',
+            'document': '# Draft',
+            'edits': None,
+        }
+        with patch.object(server, 'run_doc', return_value=run_doc_payload) as run_doc_mock:
+            response = self.client.post(
+                '/api/opinions',
+                json={
+                    'prompt': '/doc+ Draft this',
+                    'doc_plus_context': profile,
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body['mode'], 'doc_plus')
+        self.assertEqual(body['conversation_id'], 'docp-1')
+        called_prompt = run_doc_mock.call_args.args[0]
+        self.assertIn(server.DOC_PLUS_CONTEXT_HEADER, called_prompt)
+        self.assertIn(server.DOC_PLUS_USER_PROMPT_HEADER, called_prompt)
+        self.assertIn('Draft this', called_prompt)
+        self.assertEqual(run_doc_mock.call_args.kwargs['mode'], 'doc_plus')
+        self.assertEqual(
+            run_doc_mock.call_args.kwargs['model_prompt'],
+            'Profile context\n\nUser request: Draft this',
+        )
+
+    def test_post_opinions_doc_plus_reuses_existing_profile_context(self):
+        self._set_auth_override()
+        profile = 'Persisted profile'
+        wrapped_prompt = (
+            f'{server.DOC_PLUS_CONTEXT_HEADER}\n'
+            f'{profile}\n'
+            f'{server.DOC_PLUS_CONTEXT_FOOTER}\n'
+            f'{server.DOC_PLUS_USER_PROMPT_HEADER}\n'
+            'Initial request'
+        )
+        conversation = {
+            'mode': 'doc_plus',
+            'messages': [
+                {'mode': 'doc_plus', 'prompt': wrapped_prompt, 'document': '# Existing'},
+                {'mode': 'doc_plus', 'prompt': 'Continue', 'document': '# Existing'},
+            ],
+        }
+        run_doc_payload = {
+            'chat': 'Updated.',
+            'conversation_id': 'docp-2',
+            'document': '# Existing\n\nUpdated',
+            'edits': None,
+        }
+        with (
+            patch.object(server, 'get_conversation', return_value=conversation),
+            patch.object(server, 'run_doc', return_value=run_doc_payload) as run_doc_mock,
+        ):
+            response = self.client.post(
+                '/api/opinions',
+                json={'prompt': 'Continue this', 'conversation_id': 'docp-2'},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['mode'], 'doc_plus')
+        self.assertEqual(run_doc_mock.call_args.args[0], 'Continue this')
+        self.assertEqual(run_doc_mock.call_args.kwargs['mode'], 'doc_plus')
+        self.assertEqual(
+            run_doc_mock.call_args.kwargs['model_prompt'],
+            'Persisted profile\n\nUser request: Continue this',
+        )
+
+    def test_get_conversation_strips_doc_plus_internal_prompt_wrapper(self):
+        self._set_auth_override()
+        wrapped_prompt = (
+            f'{server.DOC_PLUS_CONTEXT_HEADER}\n'
+            'Profile\n'
+            f'{server.DOC_PLUS_CONTEXT_FOOTER}\n'
+            f'{server.DOC_PLUS_USER_PROMPT_HEADER}\n'
+            'Visible user prompt'
+        )
+        conversation = {
+            'conversation_id': 'c-1',
+            'mode': 'doc_plus',
+            'messages': [{'mode': 'doc_plus', 'prompt': wrapped_prompt, 'response': 'ok'}],
+        }
+        with patch.object(server, 'get_conversation', return_value=conversation):
+            response = self.client.get('/api/conversations/c-1')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()['messages'][0]['prompt'],
+            'Visible user prompt',
+        )
+
     def test_post_opinions_consensus_returns_sse_stream(self):
         self._set_auth_override()
         events = [
@@ -482,6 +614,13 @@ class ApiServerTestCase(unittest.TestCase):
         self.assertIn('text/event-stream', response.headers.get('content-type', ''))
         self.assertIn('"models_started"', response.text)
         self.assertIn('"done"', response.text)
+        parsed = self._parse_sse_events(response.text)
+        done_events = [event for event in parsed if event.get('event') == 'done']
+        self.assertEqual(len(done_events), 1)
+        self.assertEqual(
+            set(done_events[0].keys()),
+            {'event', 'mode', 'conversation_id', 'response', 'individual', 'errors'},
+        )
 
     def test_post_opinions_pr_returns_sse_and_renames_on_done(self):
         self._set_auth_override()
@@ -506,6 +645,8 @@ class ApiServerTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('text/event-stream', response.headers.get('content-type', ''))
         self.assertIn('"pr-1"', response.text)
+        parsed = self._parse_sse_events(response.text)
+        self.assertTrue(any(event.get('event') == 'done' for event in parsed))
         rename_mock.assert_called_once_with(
             'user-1',
             'pr-1',

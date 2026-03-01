@@ -1,0 +1,1679 @@
+// @ts-nocheck
+import './styles.css';
+import { readClientConfig } from './config';
+
+declare const marked: { parse: (value: string) => string };
+
+type StartRenameFn = (el: Element, conversationId: string) => void;
+
+declare global {
+  interface Window {
+    supabase?: {
+      createClient: (url: string, anonKey: string) => unknown;
+    };
+    startRename?: StartRenameFn;
+  }
+}
+
+const { supabaseUrl: SUPABASE_URL, supabaseAnonKey: SUPABASE_ANON_KEY, allowedEmailDomain: ALLOWED_EMAIL_DOMAIN } = readClientConfig();
+const supabaseClient = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+const CHAT_ITEM_CLICK_DELAY_MS = 220;
+const DOC_PLUS_BACKGROUND =
+  `A document's reader experience is shaped by attributes operating at six levels: four structural levels of scale (word, sentence, paragraph, section, whole), and one meta level that cuts across all of them. This framework identifies 30 attributes — each independently adjustable, each pinned to a spectrum of A, B, or C. It is not a complete theory of reader cognition; reader experience is also shaped by who the reader is and how they encounter the text. But as a practical system for designing and diagnosing consistency across documents, these 30 attributes are sufficient. Coherence comes from choosing a position on each and holding it, or shifting only with purpose. Drift — unintentional movement along any of these spectrums — is what makes a document feel wrong.
+
+Attribute\tLevel\tA\tB\tC
+Evidential texture\tMeta\tEvidence-heavy — data, examples, citations\tSelective — evidence at key moments\tAssertion-driven — claims on authority or bare statement
+Rhetorical mode\tMeta\tArgumentative — making a case\tExpository — explaining and informing\tNarrative — telling a story
+Temporal orientation\tMeta\tPast — retrospective, historical\tPresent — current state, what is\tFuture — projective, what will or should be
+Reflexivity\tMeta\tTransparent — regularly acknowledges its own structure\tOccasional — signposts at key moments only\tInvisible — never breaks the fourth wall
+Economy\tWord\tSpare — every word earns its place\tBalanced — occasional looseness tolerated\tExpansive — room to breathe, repeat, elaborate
+Precision\tWord\tExacting — the only right word\tAdequate — close enough to land\tSuggestive — deliberately open, letting the reader fill in
+Lexical complexity\tWord\tPlain — simplest word every time\tMixed — plain default, specialist where needed\tSpecialized — assumes reader speaks the domain
+Connotative consistency\tWord\tWarm — word choices carry positive charge\tNeutral — words chosen for meaning, not feeling\tCool — detached, clinical, or critical charge
+Register\tWord\tInformal — conversational, relaxed\tMid — professional but not stiff\tFormal — elevated, institutional
+Rhythm\tSentence\tShort and percussive\tVaried — mixes short and long\tLong and flowing
+Syntactic complexity\tSentence\tLinear — one clause, one idea\tModerate — occasional subordination\tNested — layered, recursive constructions
+Information order\tSentence\tPoint first — then qualify\tMixed — varies by context\tPoint last — build up, then deliver
+Agency\tSentence\tHuman — people do things\tMixed — depends on emphasis\tAbstract — systems, processes, forces act
+Epistemic stance\tSentence\tAssertive — states directly\tMeasured — qualifies where appropriate\tHedged — careful, provisional throughout
+Idea density\tParagraph\tSparse — one idea, fully developed\tModerate — one or two, with room\tDense — multiple ideas, tightly packed
+Abstraction level\tParagraph\tConcrete — stays in specifics and examples\tBlended — moves between both\tAbstract — lives in concepts and generalizations
+Internal structure\tParagraph\tTop-loaded — point first, then development\tMixed — varies by paragraph\tBottom-loaded — builds to the point
+Paragraph length\tParagraph\tShort — two to three sentences\tMedium — four to six sentences\tLong — seven or more, sustained development
+Cohesion\tParagraph\tChained — each sentence picks up the last\tLoose — connected but not sequential\tParallel — sentences stand side by side
+Section weight\tSection\tUniform — sections roughly equal in space\tProportional — weighted to importance\tConcentrated — most weight in one or two sections
+Section sequencing\tSection\tLinear — chronological or causal chain\tModular — self-contained, in logical order\tAssociative — thematic or lateral connections
+Inter-section transition\tSection\tExplicit — bridging passages between sections\tSignposted — brief markers at boundaries\tHard cut — white space, no verbal bridge
+Internal arc\tSection\tShaped — each section builds to something\tMixed — some sections shaped, some flat\tFlat — sections deliver information evenly
+Functional role\tSection\tDifferentiated — each section has a clear, distinct job\tSemi-differentiated — roles mostly clear\tUniform — sections serve similar functions throughout
+Implied reader\tWhole\tExpert — assumes deep familiarity\tInformed — knows the basics, needs the argument\tNewcomer — assumes little, explains as it goes
+Conceptual framing\tWhole\tSingle frame — one governing metaphor throughout\tLight framing — occasional metaphor, not structural\tNo frame — subject treated on its own terms
+Connective texture\tWhole\tExplicit — transitions stated clearly\tSelective — signposts at key turns only\tImplicit — ideas placed, reader infers the link
+Arc\tWhole\tLinear — builds in one direction\tThematic — organized by topic, not sequence\tCircular — returns to where it started, transformed
+Tonal arc\tWhole\tFlat — same emotional temperature throughout\tGradual — slow, deliberate shifts\tDynamic — intentional swings in emotional register
+Voice unity\tWhole\tSingular — unmistakably one mind\tConsistent — cohesive but not distinctive\tComposite — multiple contributors felt, but aligned`;
+const DOC_PLUS_LEVELS = [
+  {
+    id: "meta",
+    label: "Meta",
+    attributes: [
+      {
+        name: "Evidential texture",
+        choices: {
+          A: "Evidence-heavy — data, examples, citations",
+          B: "Selective — evidence at key moments",
+          C: "Assertion-driven — claims on authority or bare statement",
+        },
+      },
+      {
+        name: "Rhetorical mode",
+        choices: {
+          A: "Argumentative — making a case",
+          B: "Expository — explaining and informing",
+          C: "Narrative — telling a story",
+        },
+      },
+      {
+        name: "Temporal orientation",
+        choices: {
+          A: "Past — retrospective, historical",
+          B: "Present — current state, what is",
+          C: "Future — projective, what will or should be",
+        },
+      },
+      {
+        name: "Reflexivity",
+        choices: {
+          A: "Transparent — regularly acknowledges its own structure",
+          B: "Occasional — signposts at key moments only",
+          C: "Invisible — never breaks the fourth wall",
+        },
+      },
+    ],
+  },
+  {
+    id: "whole",
+    label: "Whole",
+    attributes: [
+      {
+        name: "Implied reader",
+        choices: {
+          A: "Expert — assumes deep familiarity",
+          B: "Informed — knows the basics, needs the argument",
+          C: "Newcomer — assumes little, explains as it goes",
+        },
+      },
+      {
+        name: "Conceptual framing",
+        choices: {
+          A: "Single frame — one governing metaphor throughout",
+          B: "Light framing — occasional metaphor, not structural",
+          C: "No frame — subject treated on its own terms",
+        },
+      },
+      {
+        name: "Connective texture",
+        choices: {
+          A: "Explicit — transitions stated clearly",
+          B: "Selective — signposts at key turns only",
+          C: "Implicit — ideas placed, reader infers the link",
+        },
+      },
+      {
+        name: "Arc",
+        choices: {
+          A: "Linear — builds in one direction",
+          B: "Thematic — organized by topic, not sequence",
+          C: "Circular — returns to where it started, transformed",
+        },
+      },
+      {
+        name: "Tonal arc",
+        choices: {
+          A: "Flat — same emotional temperature throughout",
+          B: "Gradual — slow, deliberate shifts",
+          C: "Dynamic — intentional swings in emotional register",
+        },
+      },
+      {
+        name: "Voice unity",
+        choices: {
+          A: "Singular — unmistakably one mind",
+          B: "Consistent — cohesive but not distinctive",
+          C: "Composite — multiple contributors felt, but aligned",
+        },
+      },
+    ],
+  },
+  {
+    id: "section",
+    label: "Section",
+    attributes: [
+      {
+        name: "Section weight",
+        choices: {
+          A: "Uniform — sections roughly equal in space",
+          B: "Proportional — weighted to importance",
+          C: "Concentrated — most weight in one or two sections",
+        },
+      },
+      {
+        name: "Section sequencing",
+        choices: {
+          A: "Linear — chronological or causal chain",
+          B: "Modular — self-contained, in logical order",
+          C: "Associative — thematic or lateral connections",
+        },
+      },
+      {
+        name: "Inter-section transition",
+        choices: {
+          A: "Explicit — bridging passages between sections",
+          B: "Signposted — brief markers at boundaries",
+          C: "Hard cut — white space, no verbal bridge",
+        },
+      },
+      {
+        name: "Internal arc",
+        choices: {
+          A: "Shaped — each section builds to something",
+          B: "Mixed — some sections shaped, some flat",
+          C: "Flat — sections deliver information evenly",
+        },
+      },
+      {
+        name: "Functional role",
+        choices: {
+          A: "Differentiated — each section has a clear, distinct job",
+          B: "Semi-differentiated — roles mostly clear",
+          C: "Uniform — sections serve similar functions throughout",
+        },
+      },
+    ],
+  },
+  {
+    id: "paragraph",
+    label: "Paragraph",
+    attributes: [
+      {
+        name: "Idea density",
+        choices: {
+          A: "Sparse — one idea, fully developed",
+          B: "Moderate — one or two, with room",
+          C: "Dense — multiple ideas, tightly packed",
+        },
+      },
+      {
+        name: "Abstraction level",
+        choices: {
+          A: "Concrete — stays in specifics and examples",
+          B: "Blended — moves between both",
+          C: "Abstract — lives in concepts and generalizations",
+        },
+      },
+      {
+        name: "Internal structure",
+        choices: {
+          A: "Top-loaded — point first, then development",
+          B: "Mixed — varies by paragraph",
+          C: "Bottom-loaded — builds to the point",
+        },
+      },
+      {
+        name: "Paragraph length",
+        choices: {
+          A: "Short — two to three sentences",
+          B: "Medium — four to six sentences",
+          C: "Long — seven or more, sustained development",
+        },
+      },
+      {
+        name: "Cohesion",
+        choices: {
+          A: "Chained — each sentence picks up the last",
+          B: "Loose — connected but not sequential",
+          C: "Parallel — sentences stand side by side",
+        },
+      },
+    ],
+  },
+  {
+    id: "sentence",
+    label: "Sentence",
+    attributes: [
+      {
+        name: "Rhythm",
+        choices: {
+          A: "Short and percussive",
+          B: "Varied — mixes short and long",
+          C: "Long and flowing",
+        },
+      },
+      {
+        name: "Syntactic complexity",
+        choices: {
+          A: "Linear — one clause, one idea",
+          B: "Moderate — occasional subordination",
+          C: "Nested — layered, recursive constructions",
+        },
+      },
+      {
+        name: "Information order",
+        choices: {
+          A: "Point first — then qualify",
+          B: "Mixed — varies by context",
+          C: "Point last — build up, then deliver",
+        },
+      },
+      {
+        name: "Agency",
+        choices: {
+          A: "Human — people do things",
+          B: "Mixed — depends on emphasis",
+          C: "Abstract — systems, processes, forces act",
+        },
+      },
+      {
+        name: "Epistemic stance",
+        choices: {
+          A: "Assertive — states directly",
+          B: "Measured — qualifies where appropriate",
+          C: "Hedged — careful, provisional throughout",
+        },
+      },
+    ],
+  },
+  {
+    id: "word",
+    label: "Word",
+    attributes: [
+      {
+        name: "Economy",
+        choices: {
+          A: "Spare — every word earns its place",
+          B: "Balanced — occasional looseness tolerated",
+          C: "Expansive — room to breathe, repeat, elaborate",
+        },
+      },
+      {
+        name: "Precision",
+        choices: {
+          A: "Exacting — the only right word",
+          B: "Adequate — close enough to land",
+          C: "Suggestive — deliberately open, letting the reader fill in",
+        },
+      },
+      {
+        name: "Lexical complexity",
+        choices: {
+          A: "Plain — simplest word every time",
+          B: "Mixed — plain default, specialist where needed",
+          C: "Specialized — assumes reader speaks the domain",
+        },
+      },
+      {
+        name: "Connotative consistency",
+        choices: {
+          A: "Warm — word choices carry positive charge",
+          B: "Neutral — words chosen for meaning, not feeling",
+          C: "Cool — detached, clinical, or critical charge",
+        },
+      },
+      {
+        name: "Register",
+        choices: {
+          A: "Informal — conversational, relaxed",
+          B: "Mid — professional but not stiff",
+          C: "Formal — elevated, institutional",
+        },
+      },
+    ],
+  },
+];
+const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
+
+  let currentConversationId = null;
+  let currentMode = null;
+  let loading = false;
+  let sidebarCollapsed = false;
+  let currentDocument = null;
+  let docPaneOpen = false;
+  let authSession = null;
+  let authReady = false;
+  let typoSaveTimer = null;
+  let chatItemClickTimer = null;
+  let docPlusWizardResolver = null;
+  let docPlusWizardStepIndex = 0;
+  let docPlusSelections = {};
+  let persistedUserSettings = {};
+
+  function renderAllowedDomainBadge() {
+    const badge = document.getElementById('allowedDomainBadge');
+    if (!badge) return;
+    badge.textContent = `@${ALLOWED_EMAIL_DOMAIN}`;
+  }
+
+  // --- Init ---
+  renderAllowedDomainBadge();
+  initDocPlusWizard();
+  initAuth();
+
+  function setAuthStatus(message, isError = false) {
+    const el = document.getElementById('authStatus');
+    if (!el) return;
+    el.textContent = message || '';
+    el.classList.toggle('error', !!isError);
+  }
+
+  function setAuthenticatedUi(isAuthenticated) {
+    document.getElementById('authGate').style.display = isAuthenticated ? 'none' : 'flex';
+    document.getElementById('btnSignOut').style.display = isAuthenticated ? 'inline-flex' : 'none';
+    document.getElementById('authUser').textContent = isAuthenticated ? (authSession?.user?.email || 'Signed in') : '';
+    document.getElementById('input').disabled = !isAuthenticated;
+    document.getElementById('btnSend').disabled = !isAuthenticated;
+  }
+
+  async function initAuth() {
+    if (!supabaseClient) {
+      setAuthenticatedUi(false);
+      setAuthStatus('Supabase auth is not configured on the server.', true);
+      return;
+    }
+
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) {
+      setAuthenticatedUi(false);
+      setAuthStatus('Failed to initialize authentication.', true);
+      return;
+    }
+
+    authSession = data.session;
+    authReady = true;
+    setAuthenticatedUi(!!authSession);
+
+    if (authSession) {
+      await initTypography();
+      await loadHistory();
+    } else {
+      renderHistory([]);
+    }
+
+    supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+      authSession = session;
+      setAuthenticatedUi(!!session);
+
+      if (session) {
+        setAuthStatus('');
+        await initTypography();
+        await loadHistory();
+      } else {
+        persistedUserSettings = {};
+        currentConversationId = null;
+        currentMode = null;
+        currentDocument = null;
+        document.getElementById('messageContainer').innerHTML = '';
+        document.getElementById('messages').style.display = 'none';
+        document.getElementById('welcome').style.display = 'flex';
+        renderHistory([]);
+      }
+    });
+  }
+
+  async function sendMagicLink() {
+    if (!supabaseClient) {
+      setAuthStatus('Supabase auth is not configured on the server.', true);
+      return;
+    }
+
+    const email = document.getElementById('authEmail').value.trim();
+    if (!email) {
+      setAuthStatus('Enter an email address.', true);
+      return;
+    }
+    if (email.toLowerCase().split('@')[1] !== ALLOWED_EMAIL_DOMAIN) {
+      setAuthStatus(`Only @${ALLOWED_EMAIL_DOMAIN} emails are allowed.`, true);
+      return;
+    }
+
+    const button = document.getElementById('btnAuthMagicLink');
+    button.disabled = true;
+    setAuthStatus('Sending magic link...');
+    let response = null;
+    try {
+      response = await fetch('/api/auth/magic-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          email_redirect_to: window.location.origin,
+        }),
+      });
+    } catch (e) {
+      setAuthStatus('Unable to reach auth service. Please try again.', true);
+      return;
+    } finally {
+      button.disabled = false;
+    }
+
+    if (!response.ok) {
+      let message = 'Unable to send magic link.';
+      try {
+        const payload = await response.json();
+        message = payload.detail || message;
+      } catch (e) {
+        message = 'Unable to send magic link.';
+      }
+      setAuthStatus(message, true);
+      return;
+    }
+    setAuthStatus('Check your email for the sign-in link.');
+  }
+
+  async function signOut() {
+    if (!supabaseClient) return;
+    await supabaseClient.auth.signOut();
+  }
+
+  async function getAuthToken() {
+    if (!supabaseClient) return null;
+    if (!authSession) return null;
+    return authSession.access_token;
+  }
+
+  async function apiFetch(url, options = {}) {
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('You must sign in first.');
+    }
+    const headers = Object.assign({}, options.headers || {}, {
+      Authorization: `Bearer ${token}`,
+    });
+    const response = await fetch(url, Object.assign({}, options, { headers }));
+    if (response.status === 401) {
+      await signOut();
+      throw new Error('Session expired. Please sign in again.');
+    }
+    if (response.status === 403) {
+      await signOut();
+      throw new Error(`Only @${ALLOWED_EMAIL_DOMAIN} emails are allowed.`);
+    }
+    return response;
+  }
+
+  // --- Sidebar toggle ---
+  function toggleSidebar() {
+    sidebarCollapsed = !sidebarCollapsed;
+    document.querySelector('.sidebar').classList.toggle('collapsed', sidebarCollapsed);
+  }
+
+  // --- Mode detection ---
+  function detectMode(prompt) {
+    const p = prompt.trim().toLowerCase();
+    if (p.startsWith("/doc+")) return "doc_plus";
+    if (p.startsWith("/doc")) return "doc";
+    if (p.startsWith("/pr")) return "pr";
+    if (p.startsWith("/consensus")) return "consensus";
+    if (p.startsWith("@grok")) return "grok";
+    if (p.startsWith("@gemini")) return "gemini";
+    if (p.startsWith("@gpt")) return "gpt";
+    if (p.startsWith("@claude")) return "chat";
+    return null;  // no prefix — inherit from last message
+  }
+
+  function stripDocPromptPrefix(prompt) {
+    return prompt.trim().replace(/^\/doc\+?\s*/i, "").trim();
+  }
+
+  function createDocPlusDefaultSelections() {
+    const selections = {};
+    for (const level of DOC_PLUS_LEVELS) {
+      for (const attribute of level.attributes) {
+        selections[attribute.name] = "B";
+      }
+    }
+    return selections;
+  }
+
+  function normalizeDocPlusSelections(candidate) {
+    const defaults = createDocPlusDefaultSelections();
+    if (!candidate || typeof candidate !== 'object') {
+      return defaults;
+    }
+    const normalized = Object.assign({}, defaults);
+    for (const attribute of Object.keys(defaults)) {
+      const value = candidate[attribute];
+      if (value === 'A' || value === 'B' || value === 'C') {
+        normalized[attribute] = value;
+      }
+    }
+    return normalized;
+  }
+
+  function getSavedDocPlusSelections() {
+    return normalizeDocPlusSelections(
+      persistedUserSettings[DOC_PLUS_SELECTIONS_SETTINGS_KEY],
+    );
+  }
+
+  async function saveDocPlusSelections(selections) {
+    if (!authSession) return;
+    const normalized = normalizeDocPlusSelections(selections);
+    const nextSettings = Object.assign({}, persistedUserSettings, {
+      [DOC_PLUS_SELECTIONS_SETTINGS_KEY]: normalized,
+    });
+    try {
+      await apiFetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: nextSettings }),
+      });
+      persistedUserSettings = nextSettings;
+    } catch (e) {
+      console.error('Failed to save settings', e);
+    }
+  }
+
+  function buildDocPlusContext() {
+    const lines = [
+      DOC_PLUS_BACKGROUND,
+      "",
+      "Use this profile for all document collaboration turns in this conversation.",
+      "",
+      "Selected profile:",
+    ];
+    for (const level of DOC_PLUS_LEVELS) {
+      lines.push(`${level.label}:`);
+      for (const attribute of level.attributes) {
+        const choice = docPlusSelections[attribute.name] || "B";
+        lines.push(`- ${attribute.name}: ${choice}: ${attribute.choices[choice]}`);
+      }
+      lines.push("");
+    }
+    return lines.join("\n").trim();
+  }
+
+  function closeDocPlusWizard(result) {
+    const modal = document.getElementById("docPlusModal");
+    if (modal) modal.style.display = "none";
+    document.body.classList.remove("doc-plus-open");
+    const resolver = docPlusWizardResolver;
+    docPlusWizardResolver = null;
+    if (resolver) resolver(result);
+  }
+
+  function renderDocPlusWizard() {
+    const level = DOC_PLUS_LEVELS[docPlusWizardStepIndex];
+    const title = document.getElementById("docPlusStepTitle");
+    const count = document.getElementById("docPlusStepCount");
+    const progress = document.getElementById("docPlusProgress");
+    const fields = document.getElementById("docPlusFields");
+    const back = document.getElementById("btnDocPlusBack");
+    const next = document.getElementById("btnDocPlusNext");
+    if (!level || !title || !count || !progress || !fields || !back || !next) return;
+
+    title.textContent = `${level.label} level`;
+    count.textContent = `Step ${docPlusWizardStepIndex + 1} of ${DOC_PLUS_LEVELS.length}`;
+    progress.innerHTML = DOC_PLUS_LEVELS.map((item, index) => {
+      const state = index < docPlusWizardStepIndex ? "done" : index === docPlusWizardStepIndex ? "active" : "";
+      return `<span class="doc-plus-step-chip ${state}">${item.label}</span>`;
+    }).join("");
+
+    fields.innerHTML = level.attributes.map((attribute) => {
+      const options = ["A", "B", "C"].map((choice) => {
+        const selected = docPlusSelections[attribute.name] === choice ? " selected" : "";
+        return `<option value="${choice}"${selected}>${choice}: ${esc(attribute.choices[choice])}</option>`;
+      }).join("");
+      return `
+        <label class="doc-plus-field">
+          <span class="doc-plus-field-name">${esc(attribute.name)}</span>
+          <select class="doc-plus-select" data-doc-plus-attribute="${esc(attribute.name)}">
+            ${options}
+          </select>
+        </label>`;
+    }).join("");
+
+    fields.querySelectorAll("[data-doc-plus-attribute]").forEach((node) => {
+      node.addEventListener("change", (event) => {
+        const element = event.target;
+        const attributeName = element.getAttribute("data-doc-plus-attribute");
+        docPlusSelections[attributeName] = element.value;
+      });
+    });
+
+    back.disabled = docPlusWizardStepIndex === 0;
+    next.textContent = docPlusWizardStepIndex === DOC_PLUS_LEVELS.length - 1 ? "Finish" : "Next";
+  }
+
+  function initDocPlusWizard() {
+    const modal = document.getElementById("docPlusModal");
+    const cancel = document.getElementById("btnDocPlusCancel");
+    const back = document.getElementById("btnDocPlusBack");
+    const next = document.getElementById("btnDocPlusNext");
+    if (!modal || !cancel || !back || !next) return;
+
+    cancel.addEventListener("click", () => closeDocPlusWizard(null));
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) closeDocPlusWizard(null);
+    });
+    back.addEventListener("click", () => {
+      if (docPlusWizardStepIndex === 0) return;
+      docPlusWizardStepIndex -= 1;
+      renderDocPlusWizard();
+    });
+    next.addEventListener("click", () => {
+      const lastStep = DOC_PLUS_LEVELS.length - 1;
+      if (docPlusWizardStepIndex >= lastStep) {
+        const context = buildDocPlusContext();
+        void saveDocPlusSelections(docPlusSelections);
+        closeDocPlusWizard(context);
+        return;
+      }
+      docPlusWizardStepIndex += 1;
+      renderDocPlusWizard();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      if (modal.style.display !== "flex") return;
+      closeDocPlusWizard(null);
+    });
+  }
+
+  function openDocPlusWizard() {
+    const modal = document.getElementById("docPlusModal");
+    if (!modal) return Promise.resolve(null);
+    docPlusSelections = getSavedDocPlusSelections();
+    docPlusWizardStepIndex = 0;
+    renderDocPlusWizard();
+    modal.style.display = "flex";
+    document.body.classList.add("doc-plus-open");
+    return new Promise((resolve) => {
+      docPlusWizardResolver = resolve;
+    });
+  }
+
+  // --- History ---
+  async function loadHistory() {
+    if (!authReady || !authSession) {
+      renderHistory([]);
+      return;
+    }
+    try {
+      const res = await apiFetch("/api/opinions");
+      const data = await res.json();
+      renderHistory(data);
+    } catch (e) {
+      console.error("Failed to load history", e);
+    }
+  }
+
+  function renderHistory(items) {
+    const el = document.getElementById("chatList");
+    if (!items.length) {
+      el.innerHTML = '<div class="sidebar-empty">No chats yet.<br>Ask something to get started.</div>';
+      return;
+    }
+    el.innerHTML = items.map(item => {
+      const d = item.created_at ? new Date(item.created_at + "Z") : null;
+      const date = d ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+      const active = item.conversation_id === currentConversationId ? " active" : "";
+      const mode = item.mode || "consensus";
+      const modeLabel = mode === "doc_plus" ? "doc+" : mode;
+      const title = item.title || item.prompt;
+      return `<div class="chat-item${active}" onclick="onChatItemClick('${item.conversation_id}')">
+        <button class="chat-item-delete" onclick="event.stopPropagation(); deleteChat('${item.conversation_id}')" title="Delete">&times;</button>
+        <div class="chat-item-prompt" ondblclick="event.stopPropagation(); startRename(this, '${item.conversation_id}')">${esc(title)}</div>
+        <div class="chat-item-meta">
+          <span class="chat-item-mode">${modeLabel}</span>
+          <span>${date}</span>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function clearPendingChatItemClick() {
+    if (chatItemClickTimer) {
+      clearTimeout(chatItemClickTimer);
+      chatItemClickTimer = null;
+    }
+  }
+
+  function onChatItemClick(conversationId) {
+    clearPendingChatItemClick();
+    chatItemClickTimer = setTimeout(() => {
+      chatItemClickTimer = null;
+      if (conversationId === currentConversationId) {
+        return;
+      }
+      loadConversation(conversationId);
+    }, CHAT_ITEM_CLICK_DELAY_MS);
+  }
+
+  // --- Load conversation ---
+  async function loadConversation(conversationId) {
+    try {
+      const res = await apiFetch(`/api/conversations/${conversationId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      currentConversationId = conversationId;
+      // Track last message's mode so follow-ups inherit it
+      const lastMsg = data.messages[data.messages.length - 1];
+      currentMode = lastMsg ? (lastMsg.mode || data.mode) : data.mode;
+
+      document.getElementById("welcome").style.display = "none";
+      const msgs = document.getElementById("messages");
+      msgs.style.display = "block";
+      const container = document.getElementById("messageContainer");
+      container.innerHTML = "";
+
+      let latestDoc = null;
+      for (const msg of data.messages) {
+        const msgMode = msg.mode || data.mode;
+        const responseText = (msgMode === "consensus" || msgMode === "pr") ? msg.synthesis : msg.response;
+        if (msg.document) latestDoc = msg.document;
+        container.innerHTML += `
+          <div class="message user">
+            <div class="message-bubble">${esc(msg.prompt)}</div>
+          </div>
+          <div class="message ai">
+            <div class="message-bubble prose">${md(responseText)}</div>
+            ${copyBtnHtml(responseText)}
+          </div>`;
+      }
+
+      // Restore doc pane for doc conversations
+      if ((data.mode === "doc" || data.mode === "doc_plus") && latestDoc) {
+        const docTitle = stripDocPromptPrefix(data.messages[0]?.prompt || "").substring(0, 60) || "Document";
+        openDocPane(latestDoc, docTitle);
+      } else if (docPaneOpen) {
+        closeDocPane();
+      }
+
+      msgs.scrollTop = msgs.scrollHeight;
+      loadHistory();
+    } catch (e) {
+      console.error("Failed to load conversation", e);
+    }
+  }
+
+  // --- Delete chat ---
+  async function deleteChat(conversationId) {
+    try {
+      await apiFetch(`/api/conversations/${conversationId}`, { method: "DELETE" });
+      if (currentConversationId === conversationId) newChat();
+      else loadHistory();
+    } catch (e) {
+      console.error("Failed to delete", e);
+    }
+  }
+
+  // --- Rename chat ---
+  function startRename(el, conversationId) {
+    clearPendingChatItemClick();
+    el.classList.add("editing");
+    el.contentEditable = true;
+    el.focus();
+    // Select all text
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    const save = async () => {
+      el.contentEditable = false;
+      el.classList.remove("editing");
+      const title = el.textContent.trim();
+      if (!title) { loadHistory(); return; }
+      try {
+        await apiFetch(`/api/conversations/${conversationId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title }),
+        });
+      } catch (e) {
+        console.error("Rename failed", e);
+      }
+    };
+
+    el.onblur = save;
+    el.onkeydown = (e) => {
+      if (e.key === "Enter") { e.preventDefault(); el.blur(); }
+      if (e.key === "Escape") { el.contentEditable = false; el.classList.remove("editing"); loadHistory(); }
+    };
+  }
+
+  async function copyDocument(btn) {
+    if (!currentDocument) return;
+    try {
+      await navigator.clipboard.writeText(currentDocument);
+      const svg = btn.querySelector('svg');
+      svg.innerHTML = '<polyline points="20 6 9 17 4 12"/>';
+      setTimeout(() => {
+        svg.innerHTML = '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>';
+      }, 1500);
+    } catch (e) {
+      console.error('Copy failed', e);
+    }
+  }
+
+  // --- Edit proposals (approval workflow) ---
+  let _editStore = {};
+  let _editCounter = 0;
+
+  function renderEditCards(edits) {
+    _editCounter++;
+    const batchId = 'batch' + _editCounter;
+    let html = '<div class="edit-proposals">';
+
+    edits.forEach((edit, i) => {
+      const editId = batchId + '_' + i;
+      _editStore[editId] = edit;
+
+      const ctxBefore = edit.context_before ? `<div class="edit-card-context">${esc(edit.context_before)}</div>` : '';
+      const ctxAfter = edit.context_after ? `<div class="edit-card-context">${esc(edit.context_after)}</div>` : '';
+      const oldBlock = `<div class="edit-card-old">${edit.old ? esc(edit.old) : ''}</div>`;
+      const newBlock = `<div class="edit-card-new">${edit.new ? esc(edit.new) : ''}</div>`;
+
+      html += `
+        <div class="edit-card" id="edit_${editId}">
+          <div class="edit-card-label">
+            <span>${esc(edit.description || 'Edit ' + (i + 1))}</span>
+            <span class="edit-status" id="editStatus_${editId}"></span>
+          </div>
+          <div class="edit-card-diff">
+            ${ctxBefore}
+            ${oldBlock}
+            ${newBlock}
+            ${ctxAfter}
+          </div>
+          <div class="edit-card-actions" id="editActions_${editId}">
+            <button class="btn-decline" onclick="declineEdit('${editId}')">Decline</button>
+            <button class="btn-accept" onclick="applyEdit('${editId}')">Accept</button>
+          </div>
+        </div>`;
+    });
+
+    if (edits.length > 1) {
+      html += `<div style="display:flex; justify-content:flex-end; padding-top:4px;">
+        <button class="btn-accept" style="font-size:12px; padding:5px 14px; border-radius:6px; border:1px solid #166534; cursor:pointer;"
+                onclick="acceptAllEdits('${batchId}', ${edits.length})">Accept All</button>
+      </div>`;
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  function acceptAllEdits(batchId, count) {
+    for (let i = 0; i < count; i++) {
+      const editId = batchId + '_' + i;
+      const card = document.getElementById('edit_' + editId);
+      if (card && !card.classList.contains('accepted') && !card.classList.contains('declined')) {
+        applyEdit(editId);
+      }
+    }
+  }
+
+  function applyEdit(editId) {
+    const edit = _editStore[editId];
+    if (!edit || !currentDocument) return;
+
+    const card = document.getElementById('edit_' + editId);
+    const status = document.getElementById('editStatus_' + editId);
+
+    // Build the search string: context_before + old + context_after
+    // Use old text with surrounding context for disambiguation
+    let searchStr = edit.old;
+    let replaceStr = edit.new || '';
+
+    if (searchStr === '' || searchStr === undefined) {
+      // Pure insertion — find insertion point using context
+      const insertAfter = edit.context_before || '';
+      if (insertAfter) {
+        const pos = currentDocument.indexOf(insertAfter);
+        if (pos === -1) {
+          markConflict(card, status);
+          return;
+        }
+        const insertPos = pos + insertAfter.length;
+        currentDocument = currentDocument.slice(0, insertPos) + replaceStr + currentDocument.slice(insertPos);
+      } else {
+        // Insert at beginning
+        currentDocument = replaceStr + currentDocument;
+      }
+    } else {
+      // Find the right occurrence using context
+      const fullContext = (edit.context_before || '') + searchStr + (edit.context_after || '');
+      const fullReplace = (edit.context_before || '') + replaceStr + (edit.context_after || '');
+      let pos = currentDocument.indexOf(fullContext);
+
+      if (pos !== -1) {
+        // Full context match — most precise
+        currentDocument = currentDocument.slice(0, pos) + fullReplace + currentDocument.slice(pos + fullContext.length);
+      } else {
+        // Fallback: try just the old text (less precise but works if context shifted)
+        pos = currentDocument.indexOf(searchStr);
+        if (pos === -1) {
+          markConflict(card, status);
+          return;
+        }
+        currentDocument = currentDocument.slice(0, pos) + replaceStr + currentDocument.slice(pos + searchStr.length);
+      }
+    }
+
+    // Update doc pane
+    document.getElementById('docContent').innerHTML = md(currentDocument);
+    if (docEditMode) {
+      document.getElementById('docEditor').value = currentDocument;
+    }
+
+    // Save to server
+    saveDocumentEdit();
+
+    // Visual feedback
+    card.classList.add('accepted');
+    status.textContent = 'Applied';
+    status.className = 'edit-status status-accepted';
+  }
+
+  function declineEdit(editId) {
+    const card = document.getElementById('edit_' + editId);
+    const status = document.getElementById('editStatus_' + editId);
+
+    card.classList.add('declined');
+    status.textContent = 'Declined';
+    status.className = 'edit-status status-declined';
+  }
+
+  function markConflict(card, status) {
+    card.classList.add('declined');
+    status.textContent = 'Conflict';
+    status.className = 'edit-status status-conflict';
+  }
+
+  // --- New chat ---
+  function newChat() {
+    currentConversationId = null;
+    currentMode = null;
+    document.getElementById("welcome").style.display = "flex";
+    document.getElementById("messages").style.display = "none";
+    document.getElementById("messageContainer").innerHTML = "";
+    document.getElementById("input").value = "";
+    document.getElementById("input").focus();
+    if (docPaneOpen) closeDocPane();
+    loadHistory();
+  }
+
+  // --- Document pane ---
+  function openDocPane(content, title) {
+    currentDocument = content;
+    document.getElementById("docContent").innerHTML = md(content);
+
+    // If already open, just update content — preserve user's width adjustment
+    if (docPaneOpen) {
+      if (docEditMode) {
+        document.getElementById('docEditor').value = content;
+      }
+      return;
+    }
+
+    document.getElementById("docTitle").textContent = title || "Document";
+    document.getElementById("docModeToggle").style.display = "flex";
+    docPaneOpen = true;
+    docDirty = false;
+    setDocMode('preview');
+
+    // Auto-collapse sidebar to give space
+    if (!sidebarCollapsed) toggleSidebar();
+
+    const main = document.getElementById("mainArea");
+    const docPane = document.getElementById("docPane");
+    const divider = document.getElementById("dragDivider");
+
+    // Lock main at its current computed width (gives the transition a start point)
+    main.style.flex = 'none';
+    main.style.width = main.offsetWidth + 'px';
+    main.style.minWidth = '280px';
+
+    // Open doc pane — flex:1 fills remaining space as main shrinks
+    divider.classList.add("active");
+    docPane.classList.add("open");
+    docPane.style.minWidth = '0';   // override min-width during animation
+    docPane.style.opacity = '0';
+
+    // Force layout reflow so the browser registers the starting state
+    void main.offsetWidth;
+
+    // Animate: main shrinks, doc pane content fades in
+    main.style.transition = 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+    main.style.width = '280px';
+    docPane.style.transition = 'opacity 0.45s ease 0.12s';
+    docPane.style.opacity = '1';
+
+    // After animation settles, apply final classes and clean up inline styles
+    setTimeout(() => {
+      main.classList.add('doc-active');
+      main.style.transition = '';
+      docPane.style.minWidth = '';
+      docPane.style.transition = '';
+      docPane.style.opacity = '';
+    }, 560);
+  }
+
+  function closeDocPane() {
+    const main = document.getElementById("mainArea");
+    const docPane = document.getElementById("docPane");
+    const divider = document.getElementById("dragDivider");
+
+    // Fade out doc content
+    docPane.style.transition = 'opacity 0.25s ease';
+    docPane.style.opacity = '0';
+
+    // Expand main back to full width
+    main.classList.remove("doc-active");
+    const targetW = window.innerWidth - (sidebarCollapsed ? 0 : 280);
+    main.style.transition = 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+    main.style.width = targetW + 'px';
+
+    setTimeout(() => {
+      docPane.classList.remove("open");
+      divider.classList.remove("active");
+      document.getElementById("docModeToggle").style.display = "none";
+      // Reset main to normal flex layout
+      main.style.flex = '';
+      main.style.width = '';
+      main.style.minWidth = '';
+      main.style.transition = '';
+      docPane.style.transition = '';
+      docPane.style.opacity = '';
+      docPaneOpen = false;
+      currentDocument = null;
+    }, 420);
+  }
+
+  // --- Document editor (Stage 3) ---
+  let docEditMode = false;
+  let docDirty = false;
+  let docSaveTimer = null;
+
+  function setDocMode(mode) {
+    docEditMode = (mode === 'edit');
+    const body = document.getElementById('docBody');
+
+    if (docEditMode) {
+      document.getElementById('docEditor').value = currentDocument || '';
+      body.classList.add('editing');
+    } else {
+      if (docDirty) {
+        currentDocument = document.getElementById('docEditor').value;
+        document.getElementById('docContent').innerHTML = md(currentDocument);
+        saveDocumentEdit();
+      }
+      body.classList.remove('editing');
+    }
+
+    document.getElementById('btnDocPreview').classList.toggle('active', !docEditMode);
+    document.getElementById('btnDocEdit').classList.toggle('active', docEditMode);
+  }
+
+  function onDocEdit() {
+    docDirty = true;
+    document.getElementById('docSaveStatus').textContent = 'Unsaved changes';
+    clearTimeout(docSaveTimer);
+    docSaveTimer = setTimeout(() => {
+      currentDocument = document.getElementById('docEditor').value;
+      saveDocumentEdit();
+    }, 2000);
+  }
+
+  async function saveDocumentEdit() {
+    if (!currentConversationId || !currentDocument) return;
+    try {
+      await apiFetch(`/api/conversations/${currentConversationId}/document`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document: currentDocument }),
+      });
+      docDirty = false;
+      document.getElementById('docSaveStatus').textContent = 'Saved';
+      setTimeout(() => {
+        document.getElementById('docSaveStatus').textContent = '';
+      }, 2000);
+    } catch (e) {
+      console.error('Failed to save document', e);
+      document.getElementById('docSaveStatus').textContent = 'Save failed';
+    }
+  }
+
+  // --- Drag divider ---
+  (function initDragDivider() {
+    const divider = document.getElementById('dragDivider');
+    const main = document.getElementById('mainArea');
+    let dragging = false;
+
+    divider.addEventListener('mousedown', (e) => {
+      if (!docPaneOpen) return;
+      dragging = true;
+      divider.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const minW = 280;
+      const maxW = window.innerWidth * 0.5;
+      const newW = Math.max(minW, Math.min(maxW, e.clientX));
+      main.style.width = newW + 'px';
+      main.style.transition = 'none';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      divider.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      main.style.transition = '';
+    });
+  })();
+
+  // --- Progress helpers ---
+  const _CHECK_SVG = '<svg class="step-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+  const _SPINNER_HTML = '<div class="step-spinner"></div>';
+  const _ERROR_HTML = '<span class="step-error">✕</span>';
+  const _stepTimers = {};
+
+  function addProgressStep(id, label) {
+    const steps = document.getElementById("progressSteps");
+    if (!steps) return;
+    _stepTimers[id] = performance.now();
+    steps.insertAdjacentHTML("beforeend",
+      `<div class="progress-step active" id="step-${id}">
+        <span class="step-icon">${_SPINNER_HTML}</span>
+        <span class="step-label">${label}</span>
+      </div>`);
+    const msgs = document.getElementById("messages");
+    if (msgs) msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function completeProgressStep(id, error) {
+    const step = document.getElementById("step-" + id);
+    if (!step) return;
+    step.classList.remove("active");
+    step.classList.add("done");
+    const icon = step.querySelector(".step-icon");
+    if (icon) icon.innerHTML = error ? _ERROR_HTML : _CHECK_SVG;
+    if (_stepTimers[id]) {
+      const elapsed = ((performance.now() - _stepTimers[id]) / 1000).toFixed(1);
+      const label = step.querySelector(".step-label");
+      if (label) label.textContent += ` — ${elapsed}s`;
+    }
+  }
+
+  // --- Send ---
+  async function send() {
+    const input = document.getElementById("input");
+    const prompt = input.value.trim();
+    if (!prompt || loading || !authSession) return;
+
+    // Explicit @prefix wins, otherwise inherit last mode, default to chat
+    const detected = detectMode(prompt);
+    const mode = detected || currentMode || "chat";
+    let requestConversationId = currentConversationId;
+    let docPlusContext = null;
+    if (mode === "doc_plus" && currentMode !== "doc_plus") {
+      docPlusContext = await openDocPlusWizard();
+      if (!docPlusContext) return;
+      if (currentConversationId) {
+        newChat();
+      }
+      requestConversationId = null;
+    }
+    const isStreaming = mode === "pr" || mode === "consensus";
+
+    const thinkingTexts = {
+      doc: "Working on document...",
+      doc_plus: "Working on document...",
+      pr: "Reviewing with four models",
+      consensus: "Querying four models",
+      grok: "Asking Grok...",
+      gemini: "Asking Gemini...",
+      gpt: "Asking GPT...",
+      chat: "Thinking...",
+    };
+    const thinkingText = thinkingTexts[mode] || "Thinking...";
+
+    loading = true;
+    input.value = "";
+    autoResize(input);
+    document.getElementById("btnSend").disabled = true;
+
+    // Show user message
+    document.getElementById("welcome").style.display = "none";
+    const msgs = document.getElementById("messages");
+    msgs.style.display = "block";
+    const container = document.getElementById("messageContainer");
+
+    container.innerHTML += `
+      <div class="message user">
+        <div class="message-bubble">${esc(prompt)}</div>
+      </div>`;
+
+    if (isStreaming) {
+      // Progress tracker for PR / consensus
+      container.innerHTML += `
+        <div id="thinkingBlock" class="progress-tracker">
+          <div class="progress-header">
+            <div class="thinking-dots"><span></span><span></span><span></span></div>
+            <span>${thinkingText}</span>
+          </div>
+          <div class="progress-steps" id="progressSteps"></div>
+        </div>`;
+    } else {
+      container.innerHTML += `
+        <div id="thinkingBlock" class="thinking">
+          <div class="thinking-dots"><span></span><span></span><span></span></div>
+          ${thinkingText}
+        </div>`;
+    }
+    msgs.scrollTop = msgs.scrollHeight;
+
+    try {
+      const res = await apiFetch("/api/opinions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          conversation_id: requestConversationId,
+          doc_plus_context: docPlusContext,
+        }),
+      });
+
+      const contentType = res.headers.get("content-type") || "";
+
+      if (contentType.includes("text/event-stream")) {
+        // --- SSE streaming ---
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let finalData = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const evt = JSON.parse(line.slice(6));
+
+            if (evt.event === "fetching_pr") {
+              addProgressStep("fetch", "Fetching PR");
+            } else if (evt.event === "pr_fetched") {
+              completeProgressStep("fetch");
+            } else if (evt.event === "models_started") {
+              addProgressStep("claude", "Claude");
+              addProgressStep("gpt", "GPT");
+              addProgressStep("grok", "Grok");
+              addProgressStep("gemini", "Gemini");
+            } else if (evt.event === "model_done") {
+              completeProgressStep(evt.model, evt.error);
+            } else if (evt.event === "synthesizing") {
+              addProgressStep("synthesis", "Synthesizing");
+            } else if (evt.event === "done") {
+              finalData = evt;
+            } else if (evt.event === "error") {
+              throw new Error(evt.detail || "Stream error");
+            }
+          }
+        }
+
+        if (!finalData) throw new Error("Stream ended without result");
+
+        currentConversationId = finalData.conversation_id;
+        currentMode = finalData.mode;
+
+        const thinking = document.getElementById("thinkingBlock");
+        if (thinking) thinking.remove();
+
+        container.innerHTML += `
+          <div class="message ai">
+            <div class="message-bubble prose">${md(finalData.response)}</div>
+            ${copyBtnHtml(finalData.response)}
+          </div>`;
+        msgs.scrollTop = msgs.scrollHeight;
+
+      } else {
+        // --- JSON (chat + doc modes) ---
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Request failed");
+
+        currentConversationId = data.conversation_id;
+        currentMode = data.mode;
+
+        const thinking = document.getElementById("thinkingBlock");
+        if (thinking) thinking.remove();
+
+        // Build response HTML — may include edit proposal cards
+        let responseHtml = `
+          <div class="message ai">
+            <div class="message-bubble prose">${md(data.response)}</div>`;
+
+        if (data.edits && data.edits.length > 0) {
+          responseHtml += renderEditCards(data.edits);
+        }
+
+        responseHtml += `${copyBtnHtml(data.response)}
+          </div>`;
+
+        container.innerHTML += responseHtml;
+        msgs.scrollTop = msgs.scrollHeight;
+
+        // Doc mode: open/update document pane (full doc — creation or rewrite)
+        if (data.document) {
+          const docTitle = stripDocPromptPrefix(prompt).substring(0, 60) || "Document";
+          openDocPane(data.document, docTitle);
+        }
+      }
+
+      await loadHistory();
+
+    } catch (e) {
+      const thinking = document.getElementById("thinkingBlock");
+      if (thinking) thinking.remove();
+      container.innerHTML += `
+        <div class="message ai">
+          <div class="message-bubble" style="color:#b91c1c">${esc(e.message)}</div>
+        </div>`;
+    } finally {
+      loading = false;
+      document.getElementById("btnSend").disabled = false;
+    }
+  }
+
+  // --- Helpers ---
+  function handleKey(e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  }
+
+  function autoResize(el) {
+    el.style.height = "auto";
+    const max = 160;
+    const h = Math.min(el.scrollHeight, max);
+    el.style.height = h + "px";
+    el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
+  }
+
+  function esc(s) {
+    if (!s) return "";
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function md(s) {
+    if (!s) return "";
+    return marked.parse(s);
+  }
+
+  // --- Copy to clipboard ---
+  const _responseStore = {};
+  let _responseCounter = 0;
+
+  function storeResponse(text) {
+    const id = "r" + (++_responseCounter);
+    _responseStore[id] = text;
+    return id;
+  }
+
+  function copyBtnHtml(rawText) {
+    const id = storeResponse(rawText);
+    return `<button class="btn-copy" data-rid="${id}" onclick="copyResponse(this)">
+      <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      <span>Copy</span>
+    </button>`;
+  }
+
+  async function copyResponse(btn) {
+    const text = _responseStore[btn.getAttribute("data-rid")];
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      const svg = btn.querySelector("svg");
+      const label = btn.querySelector("span");
+      svg.innerHTML = '<polyline points="20 6 9 17 4 12"/>';
+      label.textContent = "Copied";
+      setTimeout(() => {
+        svg.innerHTML = '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>';
+        label.textContent = "Copy";
+      }, 1500);
+    } catch (e) {
+      console.error("Copy failed", e);
+    }
+  }
+
+  // =========================================================
+  // Typography settings
+  // =========================================================
+
+  const TYPO_DEFAULTS = {
+    fontFamily: "system",
+    fontSize: 15,
+    lineHeight: 1.75,
+    headingWeight: 600,
+    headingLetterSpacing: -0.02,
+    headingScale: 1,
+    contentWidth: 720,
+    paragraphSpacing: 1.15,
+    headingMarginTop: 2,
+    listIndent: 1.5,
+    codeFontSize: 0.875,
+    codeBlockRadius: 8,
+    textColor: "#1c1917",
+    headingColor: "#0c0a09",
+    linkColor: "#44403c",
+    blockquoteBorderColor: "#d6d3d1",
+    blockquoteTextColor: "#57534e",
+  };
+
+  const FONT_STACKS = {
+    system: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+    georgia: 'Georgia, "Times New Roman", serif',
+    palatino: '"Palatino Linotype", Palatino, "Book Antiqua", serif',
+    charter: 'Charter, "Bitstream Charter", "Sitka Text", Cambria, serif',
+    mono: '"SF Mono", "Fira Code", Menlo, Consolas, monospace',
+  };
+
+  let typographyOpen = false;
+
+  function toggleTypography() {
+    typographyOpen = !typographyOpen;
+    document.getElementById("settingsPanel").classList.toggle("open", typographyOpen);
+    document.getElementById("btnTypography").classList.toggle("active", typographyOpen);
+  }
+
+  function onTypoChange() {
+    const s = readTypoInputs();
+    applyTypography(s);
+    updateValueDisplays();
+    updateSliderFills();
+    clearTimeout(typoSaveTimer);
+    typoSaveTimer = setTimeout(() => {
+      saveTypoSettings(s);
+    }, 250);
+  }
+
+  function readTypoInputs() {
+    return {
+      fontFamily: document.getElementById("typo-font").value,
+      fontSize: parseFloat(document.getElementById("typo-size").value),
+      lineHeight: parseFloat(document.getElementById("typo-line-height").value),
+      headingWeight: parseInt(document.getElementById("typo-heading-weight").value),
+      headingLetterSpacing: parseFloat(document.getElementById("typo-heading-spacing").value),
+      headingScale: parseFloat(document.getElementById("typo-heading-scale").value),
+      contentWidth: parseInt(document.getElementById("typo-content-width").value),
+      paragraphSpacing: parseFloat(document.getElementById("typo-paragraph").value),
+      headingMarginTop: parseFloat(document.getElementById("typo-heading-gap").value),
+      listIndent: parseFloat(document.getElementById("typo-list-indent").value),
+      codeFontSize: parseFloat(document.getElementById("typo-code-size").value),
+      codeBlockRadius: parseInt(document.getElementById("typo-code-radius").value),
+      textColor: document.getElementById("typo-text-color").value,
+      headingColor: document.getElementById("typo-heading-color").value,
+      linkColor: document.getElementById("typo-link-color").value,
+      blockquoteBorderColor: document.getElementById("typo-quote-border").value,
+      blockquoteTextColor: document.getElementById("typo-quote-text").value,
+    };
+  }
+
+  function applyTypography(s) {
+    const root = document.documentElement;
+    root.style.setProperty("--prose-font-family", FONT_STACKS[s.fontFamily] || FONT_STACKS.system);
+    root.style.setProperty("--prose-font-size", s.fontSize + "px");
+    root.style.setProperty("--prose-line-height", s.lineHeight);
+    root.style.setProperty("--prose-color", s.textColor);
+    root.style.setProperty("--prose-heading-weight", s.headingWeight);
+    root.style.setProperty("--prose-heading-letter-spacing", s.headingLetterSpacing + "em");
+    root.style.setProperty("--prose-heading-scale", s.headingScale);
+    root.style.setProperty("--prose-heading-margin-top", s.headingMarginTop + "em");
+    root.style.setProperty("--prose-heading-color", s.headingColor);
+    root.style.setProperty("--prose-paragraph-spacing", s.paragraphSpacing + "em");
+    root.style.setProperty("--prose-list-indent", s.listIndent + "em");
+    root.style.setProperty("--prose-list-item-spacing", "0.35em");
+    root.style.setProperty("--prose-code-font-size", s.codeFontSize + "em");
+    root.style.setProperty("--prose-code-block-radius", s.codeBlockRadius + "px");
+    root.style.setProperty("--prose-link-color", s.linkColor);
+    root.style.setProperty("--prose-link-underline-color", s.linkColor + "4D");
+    root.style.setProperty("--prose-blockquote-border-color", s.blockquoteBorderColor);
+    root.style.setProperty("--prose-blockquote-text-color", s.blockquoteTextColor);
+    root.style.setProperty("--prose-content-width", s.contentWidth + "px");
+  }
+
+  function populateTypoInputs(s) {
+    document.getElementById("typo-font").value = s.fontFamily;
+    document.getElementById("typo-size").value = s.fontSize;
+    document.getElementById("typo-line-height").value = s.lineHeight;
+    document.getElementById("typo-heading-weight").value = s.headingWeight;
+    document.getElementById("typo-heading-spacing").value = s.headingLetterSpacing;
+    document.getElementById("typo-heading-scale").value = s.headingScale;
+    document.getElementById("typo-content-width").value = s.contentWidth;
+    document.getElementById("typo-paragraph").value = s.paragraphSpacing;
+    document.getElementById("typo-heading-gap").value = s.headingMarginTop;
+    document.getElementById("typo-list-indent").value = s.listIndent;
+    document.getElementById("typo-code-size").value = s.codeFontSize;
+    document.getElementById("typo-code-radius").value = s.codeBlockRadius;
+    document.getElementById("typo-text-color").value = s.textColor;
+    document.getElementById("typo-heading-color").value = s.headingColor;
+    document.getElementById("typo-link-color").value = s.linkColor;
+    document.getElementById("typo-quote-border").value = s.blockquoteBorderColor;
+    document.getElementById("typo-quote-text").value = s.blockquoteTextColor;
+    updateValueDisplays();
+    updateSliderFills();
+  }
+
+  function updateValueDisplays() {
+    const v = (id) => document.getElementById(id).value;
+    const d = (id, text) => { const el = document.getElementById(id + "-value"); if (el) el.textContent = text; };
+    d("typo-size", v("typo-size") + "px");
+    d("typo-line-height", parseFloat(v("typo-line-height")).toFixed(2));
+    d("typo-heading-weight", v("typo-heading-weight"));
+    d("typo-heading-spacing", parseFloat(v("typo-heading-spacing")).toFixed(3));
+    d("typo-heading-scale", parseFloat(v("typo-heading-scale")).toFixed(2) + "\u00d7");
+    d("typo-content-width", v("typo-content-width") + "px");
+    d("typo-paragraph", parseFloat(v("typo-paragraph")).toFixed(2) + "em");
+    d("typo-heading-gap", parseFloat(v("typo-heading-gap")).toFixed(1) + "em");
+    d("typo-list-indent", parseFloat(v("typo-list-indent")).toFixed(1) + "em");
+    d("typo-code-size", parseFloat(v("typo-code-size")).toFixed(3) + "em");
+    d("typo-code-radius", v("typo-code-radius") + "px");
+  }
+
+  function updateSliderFills() {
+    document.querySelectorAll(".settings-panel input[type='range']").forEach(updateSliderFill);
+  }
+
+  function updateSliderFill(slider) {
+    const pct = (slider.value - slider.min) / (slider.max - slider.min) * 100;
+    slider.style.background = "linear-gradient(to right, var(--text-muted) " + pct + "%, var(--border) " + pct + "%)";
+  }
+
+  async function saveTypoSettings(s) {
+    if (!authSession) return;
+    const nextSettings = Object.assign({}, persistedUserSettings, s);
+    try {
+      await apiFetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: nextSettings }),
+      });
+      persistedUserSettings = nextSettings;
+    } catch (e) {
+      console.error('Failed to save settings', e);
+    }
+  }
+
+  async function loadTypoSettings() {
+    if (!authSession) {
+      persistedUserSettings = {};
+      return Object.assign({}, TYPO_DEFAULTS);
+    }
+    try {
+      const res = await apiFetch('/api/settings');
+      if (!res.ok) {
+        persistedUserSettings = {};
+        return Object.assign({}, TYPO_DEFAULTS);
+      }
+      const data = await res.json();
+      persistedUserSettings = data.settings || {};
+      return Object.assign({}, TYPO_DEFAULTS, persistedUserSettings);
+    } catch (e) {
+      persistedUserSettings = {};
+      return Object.assign({}, TYPO_DEFAULTS);
+    }
+  }
+
+  function resetTypography() {
+    populateTypoInputs(TYPO_DEFAULTS);
+    applyTypography(TYPO_DEFAULTS);
+    saveTypoSettings(TYPO_DEFAULTS);
+  }
+
+  async function initTypography() {
+    const settings = await loadTypoSettings();
+    applyTypography(settings);
+    populateTypoInputs(settings);
+  }
+
+Object.assign(window, {
+  acceptAllEdits,
+  applyEdit,
+  autoResize,
+  closeDocPane,
+  copyDocument,
+  copyResponse,
+  declineEdit,
+  deleteChat,
+  handleKey,
+  loadConversation,
+  newChat,
+  onChatItemClick,
+  onDocEdit,
+  onTypoChange,
+  resetTypography,
+  send,
+  sendMagicLink,
+  setDocMode,
+  signOut,
+  startRename,
+  toggleSidebar,
+  toggleTypography,
+});

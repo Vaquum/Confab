@@ -44,6 +44,16 @@ Returns packaged typography stylesheet.
 - Auth: No
 - Response: CSS
 
+### `GET /app/{asset_path:path}`
+
+Returns generated frontend assets bundled from `frontend/src/`.
+
+- Auth: No
+- Response: static asset (`.js`, `.css`, or other bundled file)
+- Notes:
+  - Current primary assets are `/app/gui.js` and `/app/gui.css`.
+  - Path traversal is blocked and unknown assets return `404`.
+
 ## Auth Endpoint
 
 ### `POST /api/auth/magic-link`
@@ -162,7 +172,7 @@ Deletes all messages in conversation.
 
 ### `PUT /api/conversations/{conversation_id}/document`
 
-Updates latest stored document body for a doc-mode conversation.
+Updates latest stored document body for a `doc` or `doc_plus` conversation.
 
 - Auth: Yes
 - Request body:
@@ -182,7 +192,7 @@ Updates latest stored document body for a doc-mode conversation.
 ```
 
 - Common errors:
-  - `400`: target conversation is not doc mode
+  - `400`: target conversation is not `doc` or `doc_plus` mode
   - `404`: conversation not found
 
 ## Settings Endpoints
@@ -231,15 +241,16 @@ Upserts user settings map.
 
 ### `POST /api/opinions`
 
-Primary prompt endpoint for chat, doc, consensus, and PR review.
+Primary prompt endpoint for chat, doc, doc-plus, consensus, and PR review.
 
 - Auth: Yes
 - Request body:
 
 ```json
 {
-  "prompt": "Your prompt (optionally prefixed with /doc, /consensus, /pr, @gpt, @grok, @gemini, @claude)",
-  "conversation_id": "optional-uuid"
+  "prompt": "Your prompt (optionally prefixed with /doc, /doc+, /consensus, /pr, @gpt, @grok, @gemini, @claude)",
+  "conversation_id": "optional-uuid",
+  "doc_plus_context": "required for first /doc+ turn; omitted for follow-ups"
 }
 ```
 
@@ -247,6 +258,7 @@ Primary prompt endpoint for chat, doc, consensus, and PR review.
 
 - Prefix controls explicit mode:
   - `/doc` -> doc mode
+  - `/doc+` -> doc-plus mode with persistent profile context
   - `/consensus` -> consensus mode
   - `/pr` -> PR review mode
   - `@gpt`, `@grok`, `@gemini`, `@claude` -> routed single-model chat modes
@@ -288,6 +300,12 @@ For `doc`:
 
 `document` and `edits` are mutually pattern-based depending on model output.
 
+For `doc_plus`:
+
+- Response payload shape matches `doc` mode (`response`, plus `document` or `edits`).
+- The first `/doc+` turn must include `doc_plus_context` in request body.
+- Follow-up turns in the same `doc_plus` conversation reuse persisted profile context automatically.
+
 ### SSE Streaming Modes
 
 For `/consensus` and `/pr`, response content type is `text/event-stream`.
@@ -321,6 +339,12 @@ PR events:
 - `404`: missing conversation (for specific operations)
 - `500`: internal execution error
 - `503`: auth provider unavailable
+
+Auth-provider mapping details:
+
+- Supabase `401` / `403` -> API `401`
+- Supabase `429` / `5xx` -> API `503`
+- Other non-success auth-provider status -> API `503`
 
 ## Example Requests
 

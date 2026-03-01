@@ -2,12 +2,19 @@
   "name": "confab-e2e",
   "private": true,
   "scripts": {
+    "e2e:policy": "node e2e/check-core-paths.mjs",
     "e2e": "playwright test",
+    "e2e:matrix": "npm run e2e:policy && playwright test e2e/mode-matrix.spec.ts",
     "e2e:headed": "playwright test --headed",
     "e2e:ui": "playwright test --ui",
-    "e2e:debug": "playwright test --debug"
+    "e2e:debug": "playwright test --debug",
+    "build:frontend": "vite build",
+    "typecheck:frontend": "tsc -p tsconfig.frontend.json --noEmit",
+    "check:frontend": "npm run typecheck:frontend && npm run build:frontend"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2"
+    "@playwright/test": "^1.58.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
   }
 }

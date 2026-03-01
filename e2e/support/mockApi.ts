@@ -1,6 +1,14 @@
 import type { Page, Request, Route } from '@playwright/test';
 
-type ChatMode = 'chat' | 'gpt' | 'grok' | 'gemini' | 'consensus' | 'pr' | 'doc';
+type ChatMode =
+  | 'chat'
+  | 'gpt'
+  | 'grok'
+  | 'gemini'
+  | 'consensus'
+  | 'pr'
+  | 'doc'
+  | 'doc_plus';
 
 type ConversationMessage = {
   id: number;
@@ -62,6 +70,9 @@ function nowIso(): string {
 function parseMode(prompt: string): { mode: ChatMode | null; cleanPrompt: string } {
   const stripped = prompt.trim();
   const lower = stripped.toLowerCase();
+  if (lower.startsWith('/doc+')) {
+    return { mode: 'doc_plus', cleanPrompt: stripped.slice('/doc+'.length).trim() };
+  }
   if (lower.startsWith('/doc')) {
     return { mode: 'doc', cleanPrompt: stripped.slice('/doc'.length).trim() };
   }
@@ -245,7 +256,11 @@ export async function installMockApi(
     }
 
     if (pathname === '/api/opinions' && method === 'POST') {
-      const payload = body as { prompt?: string; conversation_id?: string | null };
+      const payload = body as {
+        prompt?: string;
+        conversation_id?: string | null;
+        doc_plus_context?: string | null;
+      };
       const prompt = (payload.prompt ?? '').trim();
       const parsed = parseMode(prompt);
       const requestedMode = parsed.mode;
@@ -259,6 +274,14 @@ export async function installMockApi(
 
       if (!conversation) {
         conversation = createConversation(state, mode, prompt, cleanPrompt);
+      }
+
+      if (mode === 'doc_plus' && conversation.messages.length === 0) {
+        const profile = (payload.doc_plus_context ?? '').trim();
+        if (!profile) {
+          await jsonResponse(route, { detail: 'doc+ profile is required' }, 400);
+          return;
+        }
       }
 
       if (mode === 'consensus' || mode === 'pr') {
@@ -304,7 +327,7 @@ export async function installMockApi(
         return;
       }
 
-      if (mode === 'doc') {
+      if (mode === 'doc' || mode === 'doc_plus') {
         const currentDocument = latestDocument(conversation);
         const wantsEdits = /edit|revise|improve|change|propose/i.test(cleanPrompt);
         if (wantsEdits) {
@@ -315,7 +338,7 @@ export async function installMockApi(
             document: currentDocument,
           });
           await jsonResponse(route, {
-            mode: 'doc',
+            mode,
             conversation_id: conversation.conversation_id,
             response: 'Proposed targeted edits.',
             edits: [
@@ -342,7 +365,7 @@ export async function installMockApi(
           document: newDocument,
         });
         await jsonResponse(route, {
-          mode: 'doc',
+          mode,
           conversation_id: conversation.conversation_id,
           response: 'Document ready.',
           document: newDocument,

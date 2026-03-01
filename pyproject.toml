@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "confab"
-version = "0.6.2"
+version = "0.7.15"
 description = "A multi-chat high-productivity workground."
 readme = "README.md"
 authors = [
@@ -49,6 +49,9 @@ exclude = ["tests*", "scripts*"]
 confab = [
   "static/*.html",
   "static/*.css",
+  "static/app/*.js",
+  "static/app/*.css",
+  "static/app/assets/*",
 ]
 
 [tool.ruff]
@@ -142,3 +145,8 @@ section-order = [
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_configs = true
