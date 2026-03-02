@@ -364,19 +364,18 @@ def api_create_opinion(req: PromptRequest, user=Depends(get_current_user)):
     user_id = user['id']
     mode, clean_prompt = parse_mode(req.prompt)
     mode_override = (req.mode or '').strip().lower() or None
-    if mode_override:
-        if mode_override in (
-            'chat',
-            'gpt',
-            'grok',
-            'gemini',
-            'consensus',
-            'pr',
-            'doc',
-            'doc_plus',
-            'help',
-        ):
-            mode = mode_override
+    if mode_override and mode_override in (
+        'chat',
+        'gpt',
+        'grok',
+        'gemini',
+        'consensus',
+        'pr',
+        'doc',
+        'doc_plus',
+        'help',
+    ):
+        mode = mode_override
 
     conversation_id = req.conversation_id
     existing_conversation = None

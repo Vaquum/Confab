@@ -417,3 +417,9 @@
 - Add `IBM Plex Mono` to loaded typography families in `confab/static/typography.css` so monospace rendering stays consistent across platforms.
 - Update developer docs in `docs/Developer/API-Reference.md`, `docs/Developer/Mode-Development.md`, `docs/Developer/Architecture.md`, and `docs/Developer/Get-Started.md` for explicit mode routing, mode-lock contracts, typography ownership, and `make dev` startup guidance.
 - Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after typography and UI font updates.
+
+## v0.7.40 on 2nd of March, 2026
+
+- Refactor `parse_mode` in `confab/domain/modes.py` to remove excessive early returns while preserving all mode prefix behavior.
+- Simplify explicit mode-override routing in `confab/server.py` to a single combined condition for Ruff `SIM102` compliance.
+- Restore PR quality-gate compatibility by clearing Ruff failures in both standalone Ruff and full quality workflows.
