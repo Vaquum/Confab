@@ -1,13 +1,16 @@
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { defineConfig } from 'vite';
+
+const ROOT_DIR = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   build: {
     outDir: 'confab/static/app',
     emptyOutDir: true,
     rollupOptions: {
-      input: resolve(__dirname, 'frontend/src/main.ts'),
+      input: resolve(ROOT_DIR, 'frontend/src/main.ts'),
       output: {
         entryFileNames: 'gui.js',
         assetFileNames: (assetInfo) => {

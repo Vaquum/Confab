@@ -257,3 +257,9 @@
 - Fix doc-plus wrapper leakage in `confab/server.py` by returning an empty display prompt when internal wrapper payload is malformed or empty.
 - Add regression coverage in `tests/test_api_server.py` to verify empty wrapped doc-plus prompts are never exposed back to API clients.
 - Harden `e2e/check-core-paths.mjs` parsing to accept both single- and double-quoted values in `e2e/core-paths.ts`.
+
+## v0.7.17 on 1st of March, 2026
+
+- Fix CI frontend typechecking for `vite.config.ts` by removing `__dirname` usage and resolving paths from `import.meta.url`.
+- Add Node ambient typings to frontend tooling by setting `types: ['node']` in `tsconfig.frontend.json`.
+- Add `@types/node` as a dev dependency in `package.json` and `package-lock.json` so GitHub Actions frontend checks match local behavior.
