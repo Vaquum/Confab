@@ -5,7 +5,7 @@ services:
     region: frankfurt
     plan: starter
     autoDeploy: true
-    buildCommand: pip install uv && UV_PROJECT_ENVIRONMENT=.venv uv sync --locked --no-dev && .venv/bin/python -m compileall confab
+    buildCommand: pip install 'uv==0.10.7' && UV_PROJECT_ENVIRONMENT=.venv uv sync --locked --no-dev && .venv/bin/python -m compileall confab
     startCommand: .venv/bin/uvicorn confab.server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /
     envVars:

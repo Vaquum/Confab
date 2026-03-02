@@ -16,7 +16,6 @@
       "outputs": []
     },
     "e2e:matrix": {
-      "dependsOn": ["e2e:policy"],
       "outputs": ["playwright-report/**", "test-results/**"],
       "cache": false
     },

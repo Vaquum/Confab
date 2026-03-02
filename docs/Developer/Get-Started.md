@@ -204,7 +204,7 @@ Blueprint defaults:
 - Region: `frankfurt`
 - Auto deploy: enabled
 - Runtime: Python `3.10.14`
-- Build command: `pip install uv && UV_PROJECT_ENVIRONMENT=.venv uv sync --locked --no-dev && .venv/bin/python -m compileall confab`
+- Build command: `pip install 'uv==0.10.7' && UV_PROJECT_ENVIRONMENT=.venv uv sync --locked --no-dev && .venv/bin/python -m compileall confab`
 - Start command: `.venv/bin/uvicorn confab.server:app --host 0.0.0.0 --port $PORT`
 
 Deploy with blueprint:

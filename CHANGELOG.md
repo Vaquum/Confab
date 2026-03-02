@@ -455,3 +455,9 @@
 
 - Fix CI bootstrap mismatch in `.github/workflows/pr_checks_quality.yml`, `.github/workflows/pr_checks_tests.yml`, and `.github/workflows/pr_checks_playwright.yml` by aligning `pnpm/action-setup` version with the repository `packageManager` pin (`pnpm@10.6.1`).
 - Restore PR gate compatibility by removing pnpm version ambiguity that caused `ERR_PNPM_BAD_PM_VERSION` failures before any test steps executed.
+
+## v0.7.46 on 2nd of March, 2026
+
+- Remove duplicate policy execution in E2E smoke paths by changing `e2e:matrix` in `package.json` to run matrix tests only and removing the `e2e:policy` Turbo dependency from `turbo.json`.
+- Enforce lockfile fidelity in local/CI Python sync by adding `--locked` to `py:sync` in `package.json`.
+- Pin Render uv bootstrap in `render.yaml` and `docs/Developer/Get-Started.md` to `uv==0.10.7` for reproducible deployment toolchain behavior.
