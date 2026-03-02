@@ -30,6 +30,7 @@ This document describes the maintainable base refactor layout and developer boun
   - `history.py`
 - Repository wrappers: `confab/repositories/`
 - Database implementation: `confab/db.py`
+- User-facing mode reference source: `docs/User/Modes.md` (served by backend `help` mode)
 
 ### Frontend
 
@@ -53,6 +54,22 @@ This document describes the maintainable base refactor layout and developer boun
 3. Route handlers call orchestration services via `confab/core.py` exports.
 4. Services call provider clients and repository wrappers.
 5. Repository wrappers delegate persistence to `confab/db.py`.
+
+## Mode System Invariants
+
+When adding or changing modes, keep these files aligned:
+
+- Backend parser: `confab/domain/modes.py` (`parse_mode`)
+- API routing: `confab/server.py` (`api_create_opinion`)
+- Frontend parser: `frontend/src/main.ts` (`detectMode`)
+- Composer mode lock: `frontend/src/main.ts` (`MODE_LOCK_TOKENS`)
+- E2E mock parity: `e2e/support/mockApi.ts`
+- Matrix/policy coverage: `e2e/core-paths.ts`, `e2e/check-core-paths.mjs`
+
+Current special-mode behavior:
+
+- `/help` and `/?` map to `help` mode and return `docs/User/Modes.md` directly.
+- `help` mode is persisted and conversation-locked on follow-up turns.
 
 ## Development Rules
 

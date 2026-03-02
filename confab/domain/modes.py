@@ -5,6 +5,10 @@ def parse_mode(prompt):
     """Return mode and cleaned prompt from a prefixed prompt string."""
     stripped = prompt.strip()
     lower = stripped.lower()
+    if lower.startswith('/help'):
+        return 'help', stripped[len('/help'):].strip()
+    if lower.startswith('/?'):
+        return 'help', stripped[len('/?'):].strip()
     if lower.startswith('/doc+'):
         return 'doc_plus', stripped[len('/doc+'):].strip()
     if lower.startswith('/doc'):

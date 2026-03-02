@@ -8,7 +8,9 @@ This guide covers full local setup, auth wiring, and deployment preparation.
 - HTTP contracts: `docs/Developer/API-Reference.md`
 - CLI behavior: `docs/Developer/CLI.md`
 - Refactor architecture boundaries: `docs/Developer/Architecture.md`
+- Mode implementation workflow: `docs/Developer/Mode-Development.md`
 - Feature-change e2e policy: `docs/Developer/E2E-Policy.md`
+- User-facing mode source document: `docs/User/Modes.md`
 
 ## Prerequisites
 
@@ -56,7 +58,7 @@ Notes:
   - `GEMINI_THINKING_BUDGET` (default `512`)
   - `GEMINI_INCLUDE_THOUGHTS` (default `false`)
   - `GEMINI_TIMEOUT_SECONDS` (default `45`)
-- On Gemini timeout, Confab retries once with the same model using no thinking and a reduced token cap.
+- Confab uses `gemini-3-pro-preview` as the default Gemini model.
 
 ## Supabase Setup
 
@@ -163,6 +165,8 @@ ruff check confab tests
 pyright confab/config confab/providers confab/services confab/core.py
 npm run check:frontend
 python tests/run.py
+npm run e2e:policy
+npm run e2e:matrix
 npm run e2e
 ```
 

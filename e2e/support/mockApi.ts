@@ -2,6 +2,7 @@ import type { Page, Request, Route } from '@playwright/test';
 
 type ChatMode =
   | 'chat'
+  | 'help'
   | 'gpt'
   | 'grok'
   | 'gemini'
@@ -9,6 +10,13 @@ type ChatMode =
   | 'pr'
   | 'doc'
   | 'doc_plus';
+
+const MOCK_HELP_REFERENCE = [
+  '# Confab Modes Reference',
+  '',
+  'Use /help or /? to view this reference.',
+  'Use /doc for document editing.',
+].join('\n');
 
 type ConversationMessage = {
   id: number;
@@ -70,6 +78,12 @@ function nowIso(): string {
 function parseMode(prompt: string): { mode: ChatMode | null; cleanPrompt: string } {
   const stripped = prompt.trim();
   const lower = stripped.toLowerCase();
+  if (lower.startsWith('/help')) {
+    return { mode: 'help', cleanPrompt: stripped.slice('/help'.length).trim() };
+  }
+  if (lower.startsWith('/?')) {
+    return { mode: 'help', cleanPrompt: stripped.slice('/?'.length).trim() };
+  }
   if (lower.startsWith('/doc+')) {
     return { mode: 'doc_plus', cleanPrompt: stripped.slice('/doc+'.length).trim() };
   }
@@ -369,6 +383,20 @@ export async function installMockApi(
           conversation_id: conversation.conversation_id,
           response: 'Document ready.',
           document: newDocument,
+        });
+        return;
+      }
+
+      if (mode === 'help') {
+        appendMessage(state, conversation, {
+          mode,
+          prompt,
+          response: MOCK_HELP_REFERENCE,
+        });
+        await jsonResponse(route, {
+          mode,
+          conversation_id: conversation.conversation_id,
+          response: MOCK_HELP_REFERENCE,
         });
         return;
       }

@@ -4,6 +4,7 @@ import json
 import mimetypes
 import os
 import sys
+import uuid
 from importlib.resources import files
 from pathlib import Path
 
@@ -36,6 +37,7 @@ if __package__:
         get_user_settings,
         list_conversations,
         rename_conversation,
+        save_chat,
         save_user_settings,
         update_latest_document,
     )
@@ -68,6 +70,7 @@ else:
         get_user_settings,
         list_conversations,
         rename_conversation,
+        save_chat,
         save_user_settings,
         update_latest_document,
     )
@@ -105,6 +108,17 @@ APP_ASSET_ROOT = STATIC_ROOT.joinpath('app')
 DOC_PLUS_CONTEXT_HEADER = '[DOC_PLUS_CONTEXT]'
 DOC_PLUS_CONTEXT_FOOTER = '[/DOC_PLUS_CONTEXT]'
 DOC_PLUS_USER_PROMPT_HEADER = '[DOC_PLUS_USER_PROMPT]'
+HELP_REFERENCE_PATH = Path(__file__).resolve().parent.parent.joinpath(
+    'docs',
+    'User',
+    'Modes.md',
+)
+
+
+def _load_help_reference() -> str:
+    if not HELP_REFERENCE_PATH.is_file():
+        raise HTTPException(status_code=500, detail='Help reference is not available')
+    return HELP_REFERENCE_PATH.read_text(encoding='utf-8').strip()
 
 
 def _render_gui_html():
@@ -363,6 +377,7 @@ def api_create_opinion(req: PromptRequest, user=Depends(get_current_user)):
                 'pr',
                 'doc',
                 'doc_plus',
+                'help',
             ):
                 mode = existing_conversation['mode']
                 clean_prompt = parse_mode(req.prompt)[1]
@@ -376,6 +391,28 @@ def api_create_opinion(req: PromptRequest, user=Depends(get_current_user)):
 
     if mode is None:
         mode = 'chat'
+
+    if mode == 'help':
+        response = _load_help_reference()
+        target_conversation_id = conversation_id or str(uuid.uuid4())
+        position = (
+            len(existing_conversation['messages'])
+            if existing_conversation and existing_conversation.get('messages')
+            else 0
+        )
+        save_chat(
+            user_id,
+            target_conversation_id,
+            position,
+            req.prompt.strip(),
+            response,
+            mode='help',
+        )
+        return {
+            'mode': 'help',
+            'conversation_id': target_conversation_id,
+            'response': response,
+        }
 
     if mode in ('doc', 'doc_plus'):
         try:

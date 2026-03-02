@@ -63,6 +63,13 @@ export const MODE_MATRIX_CASES: ModeMatrixCase[] = [
     expectedResponseText: 'Mock chat response for: Give me a quick status update',
   },
   {
+    id: 'help-prefix',
+    prompt: '/help',
+    sendWith: 'enter',
+    expectedModeBadge: 'help',
+    expectedResponseText: 'Confab Modes Reference',
+  },
+  {
     id: 'gpt-prefix',
     prompt: '@gpt Summarize this project',
     sendWith: 'enter',

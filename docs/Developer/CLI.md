@@ -86,7 +86,7 @@ Internal module flow:
 
 ## What CLI Does Not Expose Yet
 
-- Direct mode switches (`/doc`, `/pr`, `@gpt`, `@grok`, `@gemini`) through dedicated CLI flags.
+- Direct mode switches (`/help`, `/?`, `/doc`, `/doc+`, `/pr`, `/consensus`, `@gpt`, `@grok`, `@gemini`, `@claude`) through dedicated CLI flags.
 - Conversation-id continuation flags.
 - Streaming progress output format (SSE-like) in CLI mode.
 

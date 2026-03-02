@@ -241,14 +241,14 @@ Upserts user settings map.
 
 ### `POST /api/opinions`
 
-Primary prompt endpoint for chat, doc, doc-plus, consensus, and PR review.
+Primary prompt endpoint for chat, help, doc, doc-plus, consensus, and PR review.
 
 - Auth: Yes
 - Request body:
 
 ```json
 {
-  "prompt": "Your prompt (optionally prefixed with /doc, /doc+, /consensus, /pr, @gpt, @grok, @gemini, @claude)",
+  "prompt": "Your prompt (optionally prefixed with /help, /?, /doc, /doc+, /consensus, /pr, @gpt, @grok, @gemini, @claude)",
   "conversation_id": "optional-uuid",
   "doc_plus_context": "required for first /doc+ turn; omitted for follow-ups"
 }
@@ -257,6 +257,7 @@ Primary prompt endpoint for chat, doc, doc-plus, consensus, and PR review.
 ### Mode Resolution
 
 - Prefix controls explicit mode:
+  - `/help` or `/?` -> help mode
   - `/doc` -> doc mode
   - `/doc+` -> doc-plus mode with persistent profile context
   - `/consensus` -> consensus mode
@@ -265,6 +266,8 @@ Primary prompt endpoint for chat, doc, doc-plus, consensus, and PR review.
 - Without prefix:
   - Existing conversation: inherits conversation context/mode rules
   - New conversation: defaults to `chat` (Claude)
+- Existing conversation mode lock currently applies to:
+  - `consensus`, `pr`, `doc`, `doc_plus`, `help`
 
 ### JSON Response Modes
 
@@ -277,6 +280,19 @@ For `chat`, `gpt`, `grok`, `gemini`:
   "response": "Model response"
 }
 ```
+
+For `help`:
+
+```json
+{
+  "mode": "help",
+  "conversation_id": "uuid",
+  "response": "# Confab Reference\n..."
+}
+```
+
+- Help mode returns the current `docs/User/Modes.md` content.
+- Help mode does not call model providers.
 
 For `doc`:
 
@@ -339,6 +355,10 @@ PR events:
 - `404`: missing conversation (for specific operations)
 - `500`: internal execution error
 - `503`: auth provider unavailable
+
+`help` mode specific `500` case:
+
+- `Help reference is not available` when `docs/User/Modes.md` is missing at runtime.
 
 Auth-provider mapping details:
 

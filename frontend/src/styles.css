@@ -244,6 +244,11 @@
     padding-right: 28px;
   }
 
+  .chat-item-prompt.attachment-name {
+    color: var(--text-faint);
+    font-weight: 400;
+  }
+
   .chat-item-prompt.editing {
     background: var(--bg-chat);
     border-radius: 4px;
@@ -386,12 +391,63 @@
   }
 
   .message.user .message-bubble {
-    white-space: pre-wrap;
     background: var(--bg-sidebar);
     color: var(--text);
     padding: 10px 16px;
     border-radius: 18px;
     max-width: 75%;
+  }
+
+  .user-bubble-content {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .user-bubble-content--attachments-only {
+    gap: 0;
+  }
+
+  .user-bubble-text {
+    white-space: pre-wrap;
+    color: var(--text);
+    line-height: 1.45;
+  }
+
+  .user-attachment-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .user-attachment-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    color: #8f8a85;
+    font-size: 12px;
+    line-height: 1.25;
+  }
+
+  .user-attachment-icon {
+    width: 12px;
+    height: 12px;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    fill: none;
+    flex-shrink: 0;
+    opacity: 0.9;
+  }
+
+  .user-attachment-name {
+    display: inline-block;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .message.ai .message-bubble {
@@ -552,6 +608,52 @@
     padding: 0 32px;
   }
 
+  .attachment-list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 8px);
+    margin: 0;
+    display: none;
+    flex-wrap: wrap;
+    gap: 6px;
+    z-index: 2;
+  }
+
+  .attachment-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid #dfdcd9;
+    background: #f6f5f3;
+    font-size: 11px;
+    line-height: 1.2;
+    color: var(--text-muted);
+    max-width: 260px;
+  }
+
+  .attachment-chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .attachment-chip-remove {
+    border: none;
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    padding: 0;
+  }
+
+  .attachment-chip-remove:hover {
+    color: var(--text-muted);
+  }
+
   .input-wrap {
     max-width: var(--prose-content-width, 720px);
     margin: 0 auto;
@@ -574,7 +676,7 @@
 
   .input-wrap textarea {
     width: 100%;
-    padding: 11px 46px 11px 16px;
+    padding: 11px 46px 11px 46px;
     border: none;
     border-radius: 12px;
     background: transparent;
@@ -589,10 +691,70 @@
     display: block;
   }
 
+  .input-wrap.mode-locked textarea {
+    padding-left: var(--mode-lock-input-padding-left, 46px);
+  }
+
   .input-wrap textarea::placeholder { color: var(--text-faint); }
   .input-wrap textarea:focus {
     border: none;
     box-shadow: none;
+  }
+
+  .btn-attach {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: #9a9793;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+    position: absolute;
+    left: 8px;
+    bottom: 6px;
+    z-index: 3;
+    padding: 0;
+    font-family: inherit;
+    font-size: 25px;
+    line-height: 1;
+    font-weight: 400;
+    text-shadow: 0 0.4px 0.6px rgba(28, 25, 23, 0.08);
+  }
+
+  .btn-attach:hover {
+    color: #88847f;
+  }
+
+  .mode-lock-chip {
+    position: absolute;
+    left: 40px;
+    bottom: 8px;
+    z-index: 3;
+    display: none;
+    align-items: center;
+    height: 28px;
+    max-width: 92px;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid #ddd6fe;
+    background: #ede9fe;
+    color: #5b53a8;
+    font-size: 11px;
+    line-height: 1;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  .input-wrap.mode-locked .mode-lock-chip {
+    display: inline-flex;
   }
 
   .btn-send {
@@ -610,6 +772,7 @@
     position: absolute;
     right: 8px;
     bottom: 6px;
+    z-index: 3;
   }
 
   .btn-send:hover { background: var(--accent-hover); }
@@ -872,9 +1035,11 @@
   .btn-copy {
     display: inline-flex;
     align-items: center;
+    align-self: flex-start;
     gap: 5px;
-    padding: 3px 8px;
+    padding: 3px 0;
     margin-top: 6px;
+    margin-left: 0;
     border: none;
     background: transparent;
     color: var(--text-faint);
@@ -996,6 +1161,14 @@
   .doc-pane-body .prose {
     max-width: 680px;
     margin: 0 auto;
+  }
+
+  .doc-pane-body .doc-suggestion-highlight {
+    background: rgba(124, 58, 237, 0.08);
+    box-shadow: inset 0 0 0 1px rgba(124, 58, 237, 0.16);
+    border-radius: 6px;
+    scroll-margin-block: 72px;
+    transition: background 0.2s ease;
   }
 
   /* Doc mode: chat shrinks to sidebar width */
@@ -1132,6 +1305,12 @@
     overflow: hidden;
     background: var(--bg-chat);
     transition: opacity 0.3s, transform 0.3s;
+    cursor: pointer;
+  }
+
+  .edit-card.focused {
+    border-color: #d8b4fe;
+    box-shadow: 0 0 0 2px rgba(216, 180, 254, 0.24);
   }
 
   .edit-card.accepted {
@@ -1236,6 +1415,15 @@
     transition: background 0.15s, border-color 0.15s;
   }
 
+  .edit-card-actions button:disabled {
+    opacity: 0.62;
+    cursor: default;
+  }
+
+  .edit-card-actions button.done {
+    opacity: 0.45;
+  }
+
   .btn-accept {
     background: #166534;
     color: white;
@@ -1245,6 +1433,11 @@
   .btn-accept:hover {
     background: #15803d;
     border-color: #15803d;
+  }
+
+  .btn-accept.done:hover {
+    background: #166534;
+    border-color: #166534;
   }
 
   .btn-decline {
@@ -1257,9 +1450,9 @@
     border-color: var(--text-muted);
   }
 
-  .edit-card.accepted .edit-card-actions,
-  .edit-card.declined .edit-card-actions {
-    display: none;
+  .btn-decline.done:hover {
+    background: var(--bg-chat);
+    border-color: var(--border);
   }
 
   body.doc-plus-open {

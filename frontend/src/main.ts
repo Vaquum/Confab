@@ -5,6 +5,14 @@ import { readClientConfig } from './config';
 declare const marked: { parse: (value: string) => string };
 
 type StartRenameFn = (el: Element, conversationId: string) => void;
+type PendingAttachment = {
+  name: string;
+  content: string;
+};
+type ComposerModeLock = {
+  token: string;
+  mode: string;
+};
 
 declare global {
   interface Window {
@@ -333,6 +341,24 @@ const DOC_PLUS_LEVELS = [
   },
 ];
 const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
+const SUPPORTED_ATTACHMENT_EXTENSIONS = new Set(['txt', 'csv', 'tsv', 'md']);
+const MODE_LOCK_TOKENS: ComposerModeLock[] = [
+  { token: '/help', mode: 'help' },
+  { token: '/?', mode: 'help' },
+  { token: '/doc+', mode: 'doc_plus' },
+  { token: '/doc', mode: 'doc' },
+  { token: '/pr', mode: 'pr' },
+  { token: '/consensus', mode: 'consensus' },
+  { token: '@grok', mode: 'grok' },
+  { token: '@gemini', mode: 'gemini' },
+  { token: '@gpt', mode: 'gpt' },
+  { token: '@claude', mode: 'chat' },
+];
+const MODE_LOCK_LEFT_OFFSET_PX = 40;
+const MODE_LOCK_CURSOR_GAP_PX = 7;
+const MIN_INPUT_LEFT_PADDING_PX = 46;
+const DOC_HIGHLIGHT_BLOCK_SELECTOR =
+  'p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, code, td, th';
 
   let currentConversationId = null;
   let currentMode = null;
@@ -347,6 +373,8 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
   let docPlusWizardResolver = null;
   let docPlusWizardStepIndex = 0;
   let docPlusSelections = {};
+  let pendingAttachments: PendingAttachment[] = [];
+  let composerModeLock: ComposerModeLock | null = null;
   let persistedUserSettings = {};
 
   function renderAllowedDomainBadge() {
@@ -355,8 +383,59 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
     badge.textContent = `@${ALLOWED_EMAIL_DOMAIN}`;
   }
 
+  function renderComposerModeLock() {
+    const chip = document.getElementById('composerModeLock');
+    const inputWrap = document.querySelector('.input-wrap');
+    if (!chip || !inputWrap) {
+      return;
+    }
+    if (!composerModeLock) {
+      chip.textContent = '';
+      chip.removeAttribute('data-mode');
+      inputWrap.classList.remove('mode-locked');
+      inputWrap.style.removeProperty('--mode-lock-input-padding-left');
+      return;
+    }
+    chip.textContent = composerModeLock.token;
+    chip.setAttribute('data-mode', composerModeLock.mode);
+    inputWrap.classList.add('mode-locked');
+    const nextPadding = Math.max(
+      MIN_INPUT_LEFT_PADDING_PX,
+      MODE_LOCK_LEFT_OFFSET_PX + chip.offsetWidth + MODE_LOCK_CURSOR_GAP_PX,
+    );
+    inputWrap.style.setProperty(
+      '--mode-lock-input-padding-left',
+      `${nextPadding}px`,
+    );
+  }
+
+  function setComposerModeLock(token: string, mode: string) {
+    composerModeLock = { token, mode };
+    renderComposerModeLock();
+  }
+
+  function clearComposerModeLock() {
+    if (!composerModeLock) {
+      return;
+    }
+    composerModeLock = null;
+    renderComposerModeLock();
+  }
+
+  function resolveModeLockToken(value: string): ComposerModeLock | null {
+    const trimmed = value.trim().toLowerCase();
+    for (const modeLock of MODE_LOCK_TOKENS) {
+      if (trimmed === modeLock.token) {
+        return modeLock;
+      }
+    }
+    return null;
+  }
+
   // --- Init ---
   renderAllowedDomainBadge();
+  renderAttachmentList();
+  renderComposerModeLock();
   setComposerCentered(true);
   initDocPlusWizard();
   initAuth();
@@ -393,13 +472,12 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
     authSession = data.session;
     authReady = true;
     setAuthenticatedUi(!!authSession);
+    syncComposerPlacement();
 
     if (authSession) {
-    setComposerCentered(true);
       await initTypography();
       await loadHistory();
     } else {
-    setComposerCentered(true);
       renderHistory([]);
     }
 
@@ -409,7 +487,7 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
 
       if (session) {
         setAuthStatus('');
-      setComposerCentered(true);
+        syncComposerPlacement();
         await initTypography();
         await loadHistory();
       } else {
@@ -417,9 +495,12 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
         currentConversationId = null;
         currentMode = null;
         currentDocument = null;
+        clearComposerModeLock();
+        pendingAttachments = [];
+        renderAttachmentList();
         document.getElementById('messageContainer').innerHTML = '';
         document.getElementById('messages').style.display = 'none';
-      setComposerCentered(true);
+        setComposerCentered(true);
         renderHistory([]);
       }
     });
@@ -518,9 +599,153 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
     main.classList.toggle('composer-centered', centered);
   }
 
+  function shouldKeepComposerDocked() {
+    const messages = document.getElementById('messages');
+    const container = document.getElementById('messageContainer');
+    const messagesVisible = !!messages && messages.style.display === 'block';
+    const hasRenderedMessages = !!container && container.childElementCount > 0;
+    return loading || currentConversationId !== null || messagesVisible || hasRenderedMessages;
+  }
+
+  function syncComposerPlacement() {
+    setComposerCentered(!shouldKeepComposerDocked());
+  }
+
+  function getAttachmentExtension(fileName) {
+    const parts = fileName.toLowerCase().split('.');
+    return parts.length > 1 ? parts[parts.length - 1] : '';
+  }
+
+  function isSupportedAttachment(file) {
+    return SUPPORTED_ATTACHMENT_EXTENSIONS.has(getAttachmentExtension(file.name));
+  }
+
+  function buildPromptWithAttachments(rawPrompt, attachments) {
+    if (!attachments.length) {
+      return rawPrompt;
+    }
+    const sections = attachments.map((attachment) => (
+      `Attachment: ${attachment.name}\n---\n${attachment.content}`
+    ));
+    const attachmentBlock = sections.join('\n\n');
+    if (!rawPrompt) {
+      return `[ATTACHMENTS]\n\n${attachmentBlock}`;
+    }
+    return `${rawPrompt}\n\n[ATTACHMENTS]\n\n${attachmentBlock}`;
+  }
+
+  function parseAttachmentDisplayPrompt(prompt) {
+    if (!prompt || typeof prompt !== 'string') {
+      return { text: '', attachmentNames: [] };
+    }
+    const marker = '\n\n[ATTACHMENTS]\n\n';
+    const markerPrefix = '[ATTACHMENTS]\n\n';
+    let textPart = prompt;
+    let attachmentBlock = '';
+    if (prompt.includes(marker)) {
+      const splitAt = prompt.indexOf(marker);
+      textPart = prompt.slice(0, splitAt);
+      attachmentBlock = prompt.slice(splitAt + marker.length);
+    } else if (prompt.startsWith(markerPrefix)) {
+      textPart = '';
+      attachmentBlock = prompt.slice(markerPrefix.length);
+    } else {
+      return { text: prompt, attachmentNames: [] };
+    }
+
+    const attachmentNames = [];
+    for (const line of attachmentBlock.split('\n')) {
+      if (!line.startsWith('Attachment: ')) continue;
+      const attachmentName = line.slice('Attachment: '.length).trim();
+      if (attachmentName) {
+        attachmentNames.push(attachmentName);
+      }
+    }
+    if (!attachmentNames.length) {
+      return { text: prompt, attachmentNames: [] };
+    }
+    return { text: textPart.trim(), attachmentNames };
+  }
+
+  function renderUserPromptBubbleHtml(promptText, explicitAttachmentNames = []) {
+    const parsed = parseAttachmentDisplayPrompt(promptText);
+    const attachmentNames = explicitAttachmentNames.length ? explicitAttachmentNames : parsed.attachmentNames;
+    const cleanText = (explicitAttachmentNames.length ? promptText : parsed.text).trim();
+    if (!attachmentNames.length) {
+      return `<div class="user-bubble-content"><div class="user-bubble-text">${esc(cleanText)}</div></div>`;
+    }
+    const attachmentRows = attachmentNames.map((attachmentName) => (
+      `<div class="user-attachment-row" title="${esc(attachmentName)}">
+        <svg class="user-attachment-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        <span class="user-attachment-name">${esc(attachmentName)}</span>
+      </div>`
+    )).join('');
+    if (!cleanText) {
+      return `<div class="user-bubble-content user-bubble-content--attachments-only"><div class="user-attachment-group">${attachmentRows}</div></div>`;
+    }
+    return `<div class="user-bubble-content"><div class="user-attachment-group">${attachmentRows}</div><div class="user-bubble-text">${esc(cleanText)}</div></div>`;
+  }
+
+  function renderAttachmentList() {
+    const list = document.getElementById('attachmentList');
+    if (!list) return;
+    if (!pendingAttachments.length) {
+      list.style.display = 'none';
+      list.innerHTML = '';
+      return;
+    }
+    list.style.display = 'flex';
+    list.innerHTML = pendingAttachments.map((attachment, index) => (
+      `<span class="attachment-chip">
+        <span class="attachment-chip-name" title="${esc(attachment.name)}">${esc(attachment.name)}</span>
+        <button class="attachment-chip-remove" onclick="removeAttachment(${index})" title="Remove attachment">&times;</button>
+      </span>`
+    )).join('');
+  }
+
+  function removeAttachment(index) {
+    if (index < 0 || index >= pendingAttachments.length) return;
+    pendingAttachments.splice(index, 1);
+    renderAttachmentList();
+  }
+
+  function openAttachmentPicker() {
+    const input = document.getElementById('attachmentInput');
+    if (!input) return;
+    input.click();
+  }
+
+  async function handleAttachmentSelection(event) {
+    const input = event.target;
+    const files = Array.from(input?.files || []);
+    if (!files.length) return;
+    const nextAttachments = [];
+    for (const file of files) {
+      if (!isSupportedAttachment(file)) {
+        console.warn(`Unsupported attachment skipped: ${file.name}`);
+        continue;
+      }
+      const content = await file.text();
+      nextAttachments.push({
+        name: file.name,
+        content,
+      });
+    }
+    if (nextAttachments.length) {
+      pendingAttachments = pendingAttachments.concat(nextAttachments);
+      renderAttachmentList();
+    }
+    input.value = '';
+  }
+
   // --- Mode detection ---
   function detectMode(prompt) {
     const p = prompt.trim().toLowerCase();
+    if (p.startsWith('/help')) return 'help';
+    if (p.startsWith('/?')) return 'help';
     if (p.startsWith("/doc+")) return "doc_plus";
     if (p.startsWith("/doc")) return "doc";
     if (p.startsWith("/pr")) return "pr";
@@ -730,10 +955,22 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
       const active = item.conversation_id === currentConversationId ? " active" : "";
       const mode = item.mode || "consensus";
       const modeLabel = mode === "doc_plus" ? "doc+" : mode;
-      const title = item.title || item.prompt;
+      let title = item.title || item.prompt || '';
+      let titleClass = '';
+      if (!item.title) {
+        const parsed = parseAttachmentDisplayPrompt(item.prompt || '');
+        if (parsed.attachmentNames.length) {
+          if (parsed.text) {
+            title = parsed.text;
+          } else {
+            title = parsed.attachmentNames[0];
+            titleClass = ' attachment-name';
+          }
+        }
+      }
       return `<div class="chat-item${active}" onclick="onChatItemClick('${item.conversation_id}')">
         <button class="chat-item-delete" onclick="event.stopPropagation(); deleteChat('${item.conversation_id}')" title="Delete">&times;</button>
-        <div class="chat-item-prompt" ondblclick="event.stopPropagation(); startRename(this, '${item.conversation_id}')">${esc(title)}</div>
+        <div class="chat-item-prompt${titleClass}" ondblclick="event.stopPropagation(); startRename(this, '${item.conversation_id}')">${esc(title)}</div>
         <div class="chat-item-meta">
           <span class="chat-item-mode">${modeLabel}</span>
           <span>${date}</span>
@@ -768,6 +1005,9 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
       const data = await res.json();
 
       currentConversationId = conversationId;
+      clearComposerModeLock();
+      pendingAttachments = [];
+      renderAttachmentList();
       setComposerCentered(false);
       // Track last message's mode so follow-ups inherit it
       const lastMsg = data.messages[data.messages.length - 1];
@@ -786,7 +1026,7 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
         if (msg.document) latestDoc = msg.document;
         container.innerHTML += `
           <div class="message user">
-            <div class="message-bubble">${esc(msg.prompt)}</div>
+            <div class="message-bubble">${renderUserPromptBubbleHtml(msg.prompt)}</div>
           </div>
           <div class="message ai">
             <div class="message-bubble prose">${md(responseText)}</div>
@@ -873,6 +1113,192 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
   // --- Edit proposals (approval workflow) ---
   let _editStore = {};
   let _editCounter = 0;
+  let _activeDocHighlightNode = null;
+  let _activeEditCardId = null;
+
+  function clearDocSuggestionFocus() {
+    if (_activeDocHighlightNode) {
+      _activeDocHighlightNode.classList.remove('doc-suggestion-highlight');
+      _activeDocHighlightNode = null;
+    }
+    if (_activeEditCardId) {
+      const previousCard = document.getElementById('edit_' + _activeEditCardId);
+      if (previousCard) {
+        previousCard.classList.remove('focused');
+      }
+      _activeEditCardId = null;
+    }
+  }
+
+  function normalizeDocSnippet(value) {
+    return (value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function findDocBlockBySnippet(root, snippet, preferLastMatch = false) {
+    const normalizedSnippet = normalizeDocSnippet(snippet);
+    if (!normalizedSnippet) {
+      return null;
+    }
+    const blocks = Array.from(root.querySelectorAll(DOC_HIGHLIGHT_BLOCK_SELECTOR));
+    if (!blocks.length) {
+      return null;
+    }
+    const compactSnippet = normalizedSnippet.length > 180
+      ? normalizedSnippet.slice(0, 180)
+      : normalizedSnippet;
+    const indexedBlocks = [];
+    let matched = null;
+    for (const block of blocks) {
+      const blockText = normalizeDocSnippet(block.innerText || block.textContent || '');
+      if (!blockText) {
+        continue;
+      }
+      indexedBlocks.push({ block, text: blockText });
+      if (blockText.includes(normalizedSnippet) || blockText.includes(compactSnippet)) {
+        matched = block;
+        if (!preferLastMatch) {
+          return matched;
+        }
+      }
+    }
+    if (matched) {
+      return matched;
+    }
+    if (!indexedBlocks.length) {
+      return null;
+    }
+
+    const fullText = indexedBlocks.map((entry) => entry.text).join(' ');
+    const searchTerms = compactSnippet === normalizedSnippet
+      ? [normalizedSnippet]
+      : [normalizedSnippet, compactSnippet];
+    for (const term of searchTerms) {
+      const position = preferLastMatch
+        ? fullText.lastIndexOf(term)
+        : fullText.indexOf(term);
+      if (position === -1) {
+        continue;
+      }
+      let cursor = 0;
+      for (const entry of indexedBlocks) {
+        const blockStart = cursor;
+        const blockEnd = blockStart + entry.text.length;
+        if (position >= blockStart && position <= blockEnd) {
+          return entry.block;
+        }
+        cursor = blockEnd + 1;
+      }
+      return indexedBlocks[indexedBlocks.length - 1].block;
+    }
+
+    const tokenCandidates = normalizedSnippet
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((token) => token.length > 2)
+      .slice(0, 16);
+    if (!tokenCandidates.length) {
+      return null;
+    }
+    let bestBlock = null;
+    let bestScore = 0;
+    for (const entry of indexedBlocks) {
+      const lowerText = entry.text.toLowerCase();
+      let score = 0;
+      for (const token of tokenCandidates) {
+        if (lowerText.includes(token)) {
+          score += 1;
+        }
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        bestBlock = entry.block;
+      }
+    }
+    if (bestScore >= 2) {
+      return bestBlock;
+    }
+    return null;
+  }
+
+  function shouldPreferLastDocMatch(edit) {
+    return !edit.old && !edit.context_after && !!edit.context_before;
+  }
+
+  function focusDocEditorSelection(edit) {
+    const editor = document.getElementById('docEditor');
+    if (!editor) {
+      return;
+    }
+    const source = editor.value || currentDocument || '';
+    if (!source) {
+      return;
+    }
+    const snippets = [edit.old, edit.context_before, edit.context_after, edit.new];
+    const preferLastMatch = shouldPreferLastDocMatch(edit);
+    let targetText = '';
+    let targetIndex = -1;
+    for (const snippet of snippets) {
+      const normalized = (snippet || '').trim();
+      if (!normalized) {
+        continue;
+      }
+      targetIndex = preferLastMatch
+        ? source.lastIndexOf(normalized)
+        : source.indexOf(normalized);
+      if (targetIndex !== -1) {
+        targetText = normalized;
+        break;
+      }
+    }
+    if (targetIndex === -1) {
+      return;
+    }
+    const targetEnd = targetIndex + targetText.length;
+    editor.focus();
+    editor.setSelectionRange(targetIndex, targetEnd);
+    const lineHeight = parseFloat(getComputedStyle(editor).lineHeight) || 20;
+    const precedingLines = source.slice(0, targetIndex).split('\n').length - 1;
+    const scrollTop = Math.max(0, (precedingLines * lineHeight) - (editor.clientHeight / 2));
+    editor.scrollTo({ top: scrollTop, behavior: 'smooth' });
+  }
+
+  function resolveDocHighlightNode(edit) {
+    const docContent = document.getElementById('docContent');
+    if (!docContent) {
+      return null;
+    }
+    const preferLastMatch = shouldPreferLastDocMatch(edit);
+    const snippets = [edit.old, edit.context_before, edit.context_after, edit.new];
+    for (const snippet of snippets) {
+      const target = findDocBlockBySnippet(docContent, snippet, preferLastMatch);
+      if (target) {
+        return target;
+      }
+    }
+    return null;
+  }
+
+  function focusEditSuggestion(editId) {
+    const edit = _editStore[editId];
+    const card = document.getElementById('edit_' + editId);
+    if (!edit || !card || !docPaneOpen) {
+      return;
+    }
+    clearDocSuggestionFocus();
+    card.classList.add('focused');
+    _activeEditCardId = editId;
+    if (docEditMode) {
+      focusDocEditorSelection(edit);
+      return;
+    }
+    const target = resolveDocHighlightNode(edit);
+    if (!target) {
+      return;
+    }
+    target.classList.add('doc-suggestion-highlight');
+    _activeDocHighlightNode = target;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+  }
 
   function renderEditCards(edits) {
     _editCounter++;
@@ -889,7 +1315,7 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
       const newBlock = `<div class="edit-card-new">${edit.new ? esc(edit.new) : ''}</div>`;
 
       html += `
-        <div class="edit-card" id="edit_${editId}">
+        <div class="edit-card" id="edit_${editId}" onclick="focusEditSuggestion('${editId}')">
           <div class="edit-card-label">
             <span>${esc(edit.description || 'Edit ' + (i + 1))}</span>
             <span class="edit-status" id="editStatus_${editId}"></span>
@@ -901,8 +1327,8 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
             ${ctxAfter}
           </div>
           <div class="edit-card-actions" id="editActions_${editId}">
-            <button class="btn-decline" onclick="declineEdit('${editId}')">Decline</button>
-            <button class="btn-accept" onclick="applyEdit('${editId}')">Accept</button>
+            <button class="btn-decline" onclick="event.stopPropagation(); declineEdit('${editId}')">Decline</button>
+            <button class="btn-accept" onclick="event.stopPropagation(); applyEdit('${editId}')">Accept</button>
           </div>
         </div>`;
     });
@@ -928,54 +1354,134 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
     }
   }
 
+  function lockEditCardActions(card, doneAction) {
+    const acceptButton = card.querySelector('.btn-accept');
+    const declineButton = card.querySelector('.btn-decline');
+    if (acceptButton) {
+      acceptButton.disabled = true;
+      acceptButton.classList.toggle('done', doneAction === 'accept');
+    }
+    if (declineButton) {
+      declineButton.disabled = true;
+      declineButton.classList.toggle('done', doneAction === 'decline');
+    }
+  }
+
+  function findInsertionPoint(documentText, contextBefore, contextAfter) {
+    const before = contextBefore || '';
+    const after = contextAfter || '';
+    if (!before && !after) {
+      return documentText.length;
+    }
+    if (before && after) {
+      const exactPos = documentText.lastIndexOf(before + after);
+      if (exactPos !== -1) {
+        return exactPos + before.length;
+      }
+      const beforePos = documentText.lastIndexOf(before);
+      if (beforePos !== -1) {
+        const candidate = beforePos + before.length;
+        const afterPos = documentText.indexOf(after, candidate);
+        if (afterPos !== -1) {
+          return afterPos;
+        }
+        return candidate;
+      }
+      return documentText.indexOf(after);
+    }
+    if (before) {
+      const beforePos = documentText.lastIndexOf(before);
+      if (beforePos === -1) {
+        return -1;
+      }
+      return beforePos + before.length;
+    }
+    return documentText.indexOf(after);
+  }
+
+  function findReplaceIndex(documentText, oldText, contextBefore, contextAfter) {
+    if (!oldText) {
+      return -1;
+    }
+    const before = contextBefore || '';
+    const after = contextAfter || '';
+    const matches = [];
+    let searchStart = 0;
+    while (searchStart <= documentText.length) {
+      const index = documentText.indexOf(oldText, searchStart);
+      if (index === -1) {
+        break;
+      }
+      const beforeMatches = !before || (
+        index >= before.length
+        && documentText.slice(index - before.length, index) === before
+      );
+      const afterMatches = !after || (
+        documentText.slice(index + oldText.length, index + oldText.length + after.length) === after
+      );
+      if (beforeMatches && afterMatches) {
+        matches.push(index);
+      }
+      searchStart = index + Math.max(1, oldText.length);
+    }
+    if (matches.length) {
+      if (before && !after) {
+        return matches[matches.length - 1];
+      }
+      return matches[0];
+    }
+    if (before && !after) {
+      return documentText.lastIndexOf(oldText);
+    }
+    return documentText.indexOf(oldText);
+  }
+
   function applyEdit(editId) {
     const edit = _editStore[editId];
     if (!edit || !currentDocument) return;
 
     const card = document.getElementById('edit_' + editId);
     const status = document.getElementById('editStatus_' + editId);
+    if (!card || card.classList.contains('accepted') || card.classList.contains('declined')) {
+      return;
+    }
 
-    // Build the search string: context_before + old + context_after
-    // Use old text with surrounding context for disambiguation
     let searchStr = edit.old;
     let replaceStr = edit.new || '';
 
     if (searchStr === '' || searchStr === undefined) {
-      // Pure insertion — find insertion point using context
-      const insertAfter = edit.context_before || '';
-      if (insertAfter) {
-        const pos = currentDocument.indexOf(insertAfter);
-        if (pos === -1) {
-          markConflict(card, status);
-          return;
-        }
-        const insertPos = pos + insertAfter.length;
-        currentDocument = currentDocument.slice(0, insertPos) + replaceStr + currentDocument.slice(insertPos);
-      } else {
-        // Insert at beginning
-        currentDocument = replaceStr + currentDocument;
+      const insertPos = findInsertionPoint(
+        currentDocument,
+        edit.context_before,
+        edit.context_after,
+      );
+      if (insertPos === -1) {
+        markConflict(card, status);
+        return;
       }
+      currentDocument = (
+        currentDocument.slice(0, insertPos)
+        + replaceStr
+        + currentDocument.slice(insertPos)
+      );
     } else {
-      // Find the right occurrence using context
-      const fullContext = (edit.context_before || '') + searchStr + (edit.context_after || '');
-      const fullReplace = (edit.context_before || '') + replaceStr + (edit.context_after || '');
-      let pos = currentDocument.indexOf(fullContext);
-
-      if (pos !== -1) {
-        // Full context match — most precise
-        currentDocument = currentDocument.slice(0, pos) + fullReplace + currentDocument.slice(pos + fullContext.length);
-      } else {
-        // Fallback: try just the old text (less precise but works if context shifted)
-        pos = currentDocument.indexOf(searchStr);
-        if (pos === -1) {
-          markConflict(card, status);
-          return;
-        }
-        currentDocument = currentDocument.slice(0, pos) + replaceStr + currentDocument.slice(pos + searchStr.length);
+      const pos = findReplaceIndex(
+        currentDocument,
+        searchStr,
+        edit.context_before,
+        edit.context_after,
+      );
+      if (pos === -1) {
+        markConflict(card, status);
+        return;
       }
+      currentDocument = (
+        currentDocument.slice(0, pos)
+        + replaceStr
+        + currentDocument.slice(pos + searchStr.length)
+      );
     }
 
-    // Update doc pane
     document.getElementById('docContent').innerHTML = md(currentDocument);
     if (docEditMode) {
       document.getElementById('docEditor').value = currentDocument;
@@ -988,15 +1494,21 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
     card.classList.add('accepted');
     status.textContent = 'Applied';
     status.className = 'edit-status status-accepted';
+    lockEditCardActions(card, 'accept');
+    focusEditSuggestion(editId);
   }
 
   function declineEdit(editId) {
     const card = document.getElementById('edit_' + editId);
     const status = document.getElementById('editStatus_' + editId);
+    if (!card || card.classList.contains('accepted') || card.classList.contains('declined')) {
+      return;
+    }
 
     card.classList.add('declined');
     status.textContent = 'Declined';
     status.className = 'edit-status status-declined';
+    lockEditCardActions(card, 'decline');
   }
 
   function markConflict(card, status) {
@@ -1009,8 +1521,11 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
   function newChat() {
     currentConversationId = null;
     currentMode = null;
-  setComposerCentered(true);
-  document.getElementById("welcome").style.display = "none";
+    clearComposerModeLock();
+    pendingAttachments = [];
+    renderAttachmentList();
+    setComposerCentered(true);
+    document.getElementById("welcome").style.display = "none";
     document.getElementById("messages").style.display = "none";
     document.getElementById("messageContainer").innerHTML = "";
     document.getElementById("input").value = "";
@@ -1021,6 +1536,7 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
 
   // --- Document pane ---
   function openDocPane(content, title) {
+    clearDocSuggestionFocus();
     currentDocument = content;
     document.getElementById("docContent").innerHTML = md(content);
 
@@ -1076,6 +1592,7 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
   }
 
   function closeDocPane() {
+    clearDocSuggestionFocus();
     const main = document.getElementById("mainArea");
     const docPane = document.getElementById("docPane");
     const divider = document.getElementById("dragDivider");
@@ -1112,6 +1629,7 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
   let docSaveTimer = null;
 
   function setDocMode(mode) {
+    clearDocSuggestionFocus();
     docEditMode = (mode === 'edit');
     const body = document.getElementById('docBody');
 
@@ -1230,12 +1748,14 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
   // --- Send ---
   async function send() {
     const input = document.getElementById("input");
-    const prompt = input.value.trim();
-    if (!prompt || loading || !authSession) return;
+    const rawPrompt = input.value.trim();
+    const attachmentsForSend = pendingAttachments.slice();
+    if ((!rawPrompt && attachmentsForSend.length === 0) || loading || !authSession) return;
+    const prompt = buildPromptWithAttachments(rawPrompt, attachmentsForSend);
 
     // Explicit @prefix wins, otherwise inherit last mode, default to chat
-    const detected = detectMode(prompt);
-    const mode = detected || currentMode || "chat";
+    const detected = detectMode(rawPrompt);
+    const mode = (composerModeLock && composerModeLock.mode) || detected || currentMode || "chat";
     let requestConversationId = currentConversationId;
     let docPlusContext = null;
     if (mode === "doc_plus" && currentMode !== "doc_plus") {
@@ -1249,6 +1769,7 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
     const isStreaming = mode === "pr" || mode === "consensus";
 
     const thinkingTexts = {
+      help: 'Opening help...',
       doc: "Working on document...",
       doc_plus: "Working on document...",
       pr: "Reviewing with four models",
@@ -1259,9 +1780,12 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
       chat: "Thinking...",
     };
     const thinkingText = thinkingTexts[mode] || "Thinking...";
+    const attachmentNames = attachmentsForSend.map((attachment) => attachment.name);
 
     loading = true;
-  setComposerCentered(false);
+    setComposerCentered(false);
+    pendingAttachments = [];
+    renderAttachmentList();
     input.value = "";
     autoResize(input);
     document.getElementById("btnSend").disabled = true;
@@ -1274,7 +1798,7 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
 
     container.innerHTML += `
       <div class="message user">
-        <div class="message-bubble">${esc(prompt)}</div>
+        <div class="message-bubble">${renderUserPromptBubbleHtml(rawPrompt, attachmentNames)}</div>
       </div>`;
 
     if (isStreaming) {
@@ -1392,7 +1916,7 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
 
         // Doc mode: open/update document pane (full doc — creation or rewrite)
         if (data.document) {
-          const docTitle = stripDocPromptPrefix(prompt).substring(0, 60) || "Document";
+        const docTitle = stripDocPromptPrefix(rawPrompt).substring(0, 60) || attachmentsForSend[0]?.name || "Document";
           openDocPane(data.document, docTitle);
         }
       }
@@ -1413,7 +1937,72 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
   }
 
   // --- Helpers ---
+  function shouldClearModeLockByDeleteKey(e, input) {
+    if (!composerModeLock) {
+      return false;
+    }
+    const atStart = input.selectionStart === 0 && input.selectionEnd === 0;
+    if (!atStart) {
+      return false;
+    }
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      e.preventDefault();
+      clearComposerModeLock();
+      return true;
+    }
+    return false;
+  }
+
+  function shouldClearModeLockByCutShortcut(e) {
+    if (!composerModeLock) {
+      return false;
+    }
+    const isCutShortcut = (e.key === 'x' || e.key === 'X') && (e.metaKey || e.ctrlKey);
+    if (!isCutShortcut) {
+      return false;
+    }
+    clearComposerModeLock();
+    return true;
+  }
+
+  function shouldApplyModeLockBySpace(e, input) {
+    if (composerModeLock) {
+      return false;
+    }
+    if (e.key !== ' ' || e.metaKey || e.ctrlKey || e.altKey) {
+      return false;
+    }
+    if (input.selectionStart !== input.selectionEnd) {
+      return false;
+    }
+    if (input.selectionStart !== input.value.length) {
+      return false;
+    }
+    const modeLock = resolveModeLockToken(input.value);
+    if (!modeLock) {
+      return false;
+    }
+    e.preventDefault();
+    setComposerModeLock(modeLock.token, modeLock.mode);
+    input.value = '';
+    autoResize(input);
+    return true;
+  }
+
   function handleKey(e) {
+    const input = e.target;
+    if (!input) {
+      return;
+    }
+    if (shouldApplyModeLockBySpace(e, input)) {
+      return;
+    }
+    if (shouldClearModeLockByDeleteKey(e, input)) {
+      return;
+    }
+    if (shouldClearModeLockByCutShortcut(e)) {
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       send();
@@ -1675,12 +2264,16 @@ Object.assign(window, {
   copyResponse,
   declineEdit,
   deleteChat,
+  focusEditSuggestion,
+  handleAttachmentSelection,
   handleKey,
   loadConversation,
   newChat,
   onChatItemClick,
   onDocEdit,
   onTypoChange,
+  openAttachmentPicker,
+  removeAttachment,
   resetTypography,
   send,
   sendMagicLink,

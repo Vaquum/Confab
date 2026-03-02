@@ -70,11 +70,15 @@
 
     <div class="input-area">
       <div class="input-wrap">
+        <div class="attachment-list" id="attachmentList"></div>
+        <button class="btn-attach" id="btnAttach" onclick="openAttachmentPicker()" title="Add attachment" aria-label="Add attachment">+</button>
+        <span class="mode-lock-chip" id="composerModeLock" aria-live="polite"></span>
         <textarea id="input" placeholder="" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
         <button class="btn-send" id="btnSend" onclick="send()">
           <svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
         </button>
       </div>
+      <input id="attachmentInput" type="file" accept=".txt,.csv,.tsv,.md,text/plain,text/csv,text/tab-separated-values,text/markdown" multiple style="display:none" onchange="handleAttachmentSelection(event)">
     </div>
   </main>
 

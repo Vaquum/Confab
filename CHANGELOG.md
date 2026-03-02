@@ -283,3 +283,122 @@
 - Fine-tune composer button sizing in `frontend/src/styles.css` by reducing the inline send button dimensions and icon scale slightly for cleaner visual balance.
 - Rebalance single-line textarea metrics in `frontend/src/styles.css` by adjusting line-height and padding so the text cursor sits vertically centered in the composer.
 - Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after the composer micro-alignment update.
+
+## v0.7.21 on 1st of March, 2026
+
+- Add inline attachment support in `frontend/src/main.ts` and `confab/static/gui.html` with a left-side plus button in the composer and file picker wiring.
+- Restrict supported attachment types to `.txt`, `.csv`, `.tsv`, and `.md`, and render removable attachment chips above the composer before send.
+- Include selected attachment contents in the prompt payload for `/api/opinions` requests while preserving normal mode routing and conversation flow.
+- Update composer layout in `frontend/src/styles.css` so left and right action buttons are symmetrically positioned, with the attachment button styled in mid-grey.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after attachment UX updates.
+
+## v0.7.22 on 1st of March, 2026
+
+- Fix composer docking persistence in `frontend/src/main.ts` so auth/session refresh events do not recenter the composer after a chat has started.
+- Add composer state guards in `frontend/src/main.ts` that keep the composer bottom-docked whenever a conversation is active, messages are visible, or a send is in progress.
+- Keep centered composer behavior restricted to explicit reset states (`new chat` or signed-out empty state) while preserving the existing smooth center-to-bottom transition.
+- Regenerate frontend static bundles in `confab/static/app/gui.js` after the composer state persistence fix.
+
+## v0.7.23 on 1st of March, 2026
+
+- Restyle the attachment control in `confab/static/gui.html` and `frontend/src/styles.css` from a button-like icon to a plain `+` glyph while keeping click behavior unchanged.
+- Keep attachment control sizing nearly aligned with the send control while removing background/border chrome for a lighter composer aesthetic.
+- Add an ultra-subtle text shadow to the `+` glyph in `frontend/src/styles.css` to provide minimal visual gravity without visible heaviness.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after attachment glyph styling updates.
+
+## v0.7.24 on 1st of March, 2026
+
+- Replace user-message attachment text fallback in `frontend/src/main.ts` with inline file rows that render a small file icon and truncated filename in a lighter visual tone.
+- Keep attachment-only user bubbles compact by rendering just the attachment row content when no typed text is present.
+- Render mixed attachment-plus-text user messages with attachment rows first and normal composer text beneath in the same bubble.
+- Update attachment-related message styles in `frontend/src/styles.css` and regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js`.
+
+## v0.7.25 on 1st of March, 2026
+
+- Fix composer vertical stability during attachment add/remove by moving `#attachmentList` inside `input-wrap` in `confab/static/gui.html`.
+- Remove attachment chip layout impact in `frontend/src/styles.css` by absolutely positioning `.attachment-list` above the composer, keeping input placement unchanged.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after attachment layout stabilization.
+
+## v0.7.26 on 1st of March, 2026
+
+- Fix attachment control visibility in `frontend/src/styles.css` by giving `.btn-attach` an explicit foreground layer so the `+` stays visible above the textarea.
+- Keep right control parity by applying the same explicit layer level to `.btn-send`.
+- Preserve non-shifting attachment chips while assigning `.attachment-list` its own layer just above the composer surface.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after attachment control layering fixes.
+
+## v0.7.27 on 1st of March, 2026
+
+- Add composer mode-lock UX in `confab/static/gui.html`, `frontend/src/main.ts`, and `frontend/src/styles.css` so supported prefixes (`/doc`, `/doc+`, `/pr`, `/consensus`, `@grok`, `@gemini`, `@gpt`, `@claude`) lock into a colored chip when space is pressed.
+- Route send-mode resolution through the active mode-lock chip in `frontend/src/main.ts` while keeping existing prefix parsing fallback behavior intact.
+- Add one-action removal for the mode-lock chip in `frontend/src/main.ts` so Backspace/Delete at the chip boundary, or Cut shortcut, clears the full label at once.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after mode-lock UI and keyboard interaction updates.
+
+## v0.7.28 on 1st of March, 2026
+
+- Refine the attachment control glyph in `frontend/src/styles.css` by making the `+` slightly larger while keeping the control minimal and centered.
+- Shift the attachment control tone to a lighter, less saturated grey in normal and hover states for a softer visual balance with the composer.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after attachment glyph tone/size tuning.
+
+## v0.7.29 on 1st of March, 2026
+
+- Fix sidebar chat-title rendering for attachment prompts in `frontend/src/main.ts` so attachment-only conversations show the file name instead of `[ATTACHMENTS]` marker text.
+- Keep mixed typed+attachment conversation titles clean in `frontend/src/main.ts` by using the typed segment as the title when present.
+- Add lighter attachment-title styling in `frontend/src/styles.css` for sidebar entries that represent file names rather than typed message text.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after sidebar title parsing and styling updates.
+
+## v0.7.30 on 1st of March, 2026
+
+- Add configurable `GEMINI_FALLBACK_MODEL` in `confab/config/settings.py` (default `gemini-3-pro-preview`) and export it via `confab/config/__init__.py`.
+- Fix Gemini timeout fallback in `confab/providers/llm.py` by keeping a valid non-zero thinking budget instead of forcing `thinking_budget=0` for models that require thinking mode.
+- Add transient Gemini failover in `confab/providers/llm.py` so `500`/`503`/`504` provider failures on `GEMINI_MODEL` retry against `GEMINI_FALLBACK_MODEL`.
+- Update `docs/Developer/Get-Started.md` to document `GEMINI_FALLBACK_MODEL` and the revised Gemini timeout/failover behavior.
+
+## v0.7.31 on 1st of March, 2026
+
+- Fix mode-lock caret placement in `frontend/src/main.ts` and `frontend/src/styles.css` by calculating input left padding from the actual chip width so the cursor starts immediately after the lock label.
+- Set Gemini default model to `gemini-3-pro-preview` in `confab/config/settings.py` to avoid `gemini-3.1-pro-preview` instability and waiting behavior.
+- Remove Gemini fallback/failover chain from `confab/providers/llm.py` and related config exports in `confab/config/__init__.py` for a direct single-model call path.
+- Update `docs/Developer/Get-Started.md` Gemini notes to reflect the direct default model behavior.
+
+## v0.7.32 on 1st of March, 2026
+
+- Fix `/doc` insertion reliability in `frontend/src/main.ts` by using context-aware insertion/replacement matching that prefers end-anchored matches for append-style edits.
+- Add interactive `/doc` suggestion targeting in `frontend/src/main.ts` so clicking an edit card highlights the corresponding section in the document pane and smoothly scrolls it into view.
+- Add visual focus states in `frontend/src/styles.css` for selected edit cards and highlighted document sections to make suggestion-to-document mapping explicit for reviewers.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after `/doc` edit interaction and highlighting updates.
+
+## v0.7.33 on 1st of March, 2026
+
+- Fix AI response copy-control alignment in `frontend/src/styles.css` by anchoring `.btn-copy` to the left edge of the text block with non-stretched sizing.
+- Remove extra left inset from `.btn-copy` so the copy icon/text baseline aligns cleanly with the response content start.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after copy-control alignment refinement.
+
+## v0.7.34 on 1st of March, 2026
+
+- Update `/doc` edit-action state handling in `frontend/src/main.ts` so accepted/declined cards keep their action row visible while locking both buttons against repeat clicks.
+- Add explicit done-state dimming for clicked `/doc` action buttons in `frontend/src/styles.css` so Accept/Decline clearly indicate completion after single or bulk apply.
+- Remove action-row hiding for accepted/declined cards in `frontend/src/styles.css` to preserve post-action visual feedback.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after `/doc` action-state styling updates.
+
+## v0.7.35 on 2nd of March, 2026
+
+- Fix `/doc` suggestion click targeting in `frontend/src/main.ts` by replacing single-block snippet matching with a full-document positional matcher that resolves cross-block context reliably.
+- Remove the fallback that previously highlighted `docContent.firstElementChild`, preventing non-matching suggestions from jumping to the article title.
+- Add token-overlap fallback targeting in `frontend/src/main.ts` so low-fidelity snippet matches still resolve to the most likely document block instead of a fixed anchor.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after `/doc` suggestion targeting updates.
+
+## v0.7.36 on 2nd of March, 2026
+
+- Add end-user mode reference in `docs/User/Modes.md` with concise, child-friendly guidance for each supported mode and attachment support.
+- Add `/help` and `/?` aliases in `confab/domain/modes.py` and `frontend/src/main.ts`, with mode-lock support, so help mode can be selected and persisted like other prompt modes.
+- Add backend help-mode handling in `confab/server.py` to return `docs/User/Modes.md` content directly and persist the turn without calling any model.
+- Extend API and e2e coverage for the new mode in `tests/test_api_server.py`, `e2e/core-paths.ts`, `e2e/check-core-paths.mjs`, and `e2e/support/mockApi.ts`, and update required-mode policy in `docs/Developer/E2E-Policy.md`.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after help-mode frontend updates.
+
+## v0.7.37 on 2nd of March, 2026
+
+- Expand `docs/Developer/API-Reference.md` with `/help` and `/?` routing, help-mode response contract, mode-lock continuation behavior, and help-specific runtime error notes.
+- Add `docs/Developer/Mode-Development.md` as the canonical maintainer checklist for mode changes across parser, API routing, frontend detection/mode-lock, tests, e2e policy, and user docs.
+- Update `docs/Developer/Architecture.md` to document mode-system invariants and the runtime dependency on `docs/User/Modes.md` for `help` responses.
+- Update `docs/Developer/Get-Started.md` docs map and quality-gate command list to include mode-development guidance and explicit e2e policy/matrix checks.
+- Update `docs/Developer/CLI.md` and `docs/Developer/E2E-Policy.md` to reflect full mode/alias coverage expectations used in day-to-day maintenance.
