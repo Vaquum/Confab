@@ -5,7 +5,7 @@ services:
     region: frankfurt
     plan: starter
     autoDeploy: true
-    buildCommand: pip install -e .
+    buildCommand: pip install -e . && python -m compileall confab
     startCommand: uvicorn confab.server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /
     envVars:

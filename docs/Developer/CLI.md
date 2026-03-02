@@ -19,6 +19,8 @@ Equivalent:
 python -m confab "your prompt here"
 ```
 
+Recommended working directory: repository root.
+
 ## Positional Arguments
 
 - `prompt` (required): prompt text to process.
@@ -64,6 +66,14 @@ Database config:
 5. Persist prompt/results to database.
 6. Print final synthesis.
 
+Internal module flow:
+
+- CLI entrypoint: `confab.__main__:main`
+- Facade layer: `confab/core.py`
+- Services: `confab/services/*`
+- Providers: `confab/providers/*`
+- Persistence: `confab/db.py` via repository wrappers
+
 ## Data Persistence Semantics
 
 - Each CLI invocation creates a new conversation id.
@@ -79,6 +89,11 @@ Database config:
 - Direct mode switches (`/doc`, `/pr`, `@gpt`, `@grok`, `@gemini`) through dedicated CLI flags.
 - Conversation-id continuation flags.
 - Streaming progress output format (SSE-like) in CLI mode.
+
+## Interaction with Refactored Frontend
+
+- CLI is backend-only and does not require `frontend/src/` build artifacts.
+- Frontend bundling (`npm run check:frontend`) is independent from CLI execution.
 
 ## Examples
 
