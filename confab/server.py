@@ -105,6 +105,17 @@ APP_ASSET_ROOT = STATIC_ROOT.joinpath('app')
 DOC_PLUS_CONTEXT_HEADER = '[DOC_PLUS_CONTEXT]'
 DOC_PLUS_CONTEXT_FOOTER = '[/DOC_PLUS_CONTEXT]'
 DOC_PLUS_USER_PROMPT_HEADER = '[DOC_PLUS_USER_PROMPT]'
+HELP_REFERENCE_PATH = Path(__file__).resolve().parent.parent.joinpath(
+    'docs',
+    'User',
+    'Modes.md',
+)
+
+
+def _load_help_reference() -> str:
+    if not HELP_REFERENCE_PATH.is_file():
+        raise HTTPException(status_code=500, detail='Help reference is not available')
+    return HELP_REFERENCE_PATH.read_text(encoding='utf-8').strip()
 
 
 def _render_gui_html():
@@ -352,6 +363,19 @@ def api_save_settings(req: SettingsRequest, user=Depends(get_current_user)):
 def api_create_opinion(req: PromptRequest, user=Depends(get_current_user)):
     user_id = user['id']
     mode, clean_prompt = parse_mode(req.prompt)
+    mode_override = (req.mode or '').strip().lower() or None
+    if mode_override and mode_override in (
+        'chat',
+        'gpt',
+        'grok',
+        'gemini',
+        'consensus',
+        'pr',
+        'doc',
+        'doc_plus',
+        'help',
+    ):
+        mode = mode_override
 
     conversation_id = req.conversation_id
     existing_conversation = None
@@ -372,10 +396,19 @@ def api_create_opinion(req: PromptRequest, user=Depends(get_current_user)):
                     if existing_conversation['messages']
                     else None
                 )
-                mode = last_msg.get('mode', 'chat') if last_msg else 'chat'
+                last_mode = last_msg.get('mode', 'chat') if last_msg else 'chat'
+                mode = 'chat' if last_mode == 'help' else last_mode
 
     if mode is None:
         mode = 'chat'
+
+    if mode == 'help':
+        response = _load_help_reference()
+        return {
+            'mode': 'help',
+            'conversation_id': conversation_id,
+            'response': response,
+        }
 
     if mode in ('doc', 'doc_plus'):
         try:

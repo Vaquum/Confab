@@ -2,6 +2,7 @@ import type { Page, Request, Route } from '@playwright/test';
 
 type ChatMode =
   | 'chat'
+  | 'help'
   | 'gpt'
   | 'grok'
   | 'gemini'
@@ -9,6 +10,13 @@ type ChatMode =
   | 'pr'
   | 'doc'
   | 'doc_plus';
+
+const MOCK_HELP_REFERENCE = [
+  '# Confab Modes Reference',
+  '',
+  'Use /help or /? to view this reference.',
+  'Use /doc for document editing.',
+].join('\n');
 
 type ConversationMessage = {
   id: number;
@@ -70,6 +78,12 @@ function nowIso(): string {
 function parseMode(prompt: string): { mode: ChatMode | null; cleanPrompt: string } {
   const stripped = prompt.trim();
   const lower = stripped.toLowerCase();
+  if (lower.startsWith('/help')) {
+    return { mode: 'help', cleanPrompt: stripped.slice('/help'.length).trim() };
+  }
+  if (lower.startsWith('/?')) {
+    return { mode: 'help', cleanPrompt: stripped.slice('/?'.length).trim() };
+  }
   if (lower.startsWith('/doc+')) {
     return { mode: 'doc_plus', cleanPrompt: stripped.slice('/doc+'.length).trim() };
   }
@@ -260,10 +274,11 @@ export async function installMockApi(
         prompt?: string;
         conversation_id?: string | null;
         doc_plus_context?: string | null;
+        mode?: ChatMode | null;
       };
       const prompt = (payload.prompt ?? '').trim();
       const parsed = parseMode(prompt);
-      const requestedMode = parsed.mode;
+      const requestedMode = payload.mode ?? parsed.mode;
       const cleanPrompt = parsed.cleanPrompt || prompt;
 
       let conversation: Conversation | undefined;
@@ -271,6 +286,15 @@ export async function installMockApi(
         conversation = state.conversations.get(payload.conversation_id) ?? undefined;
       }
       const mode = requestedMode ?? conversation?.mode ?? 'chat';
+
+      if (mode === 'help') {
+        await jsonResponse(route, {
+          mode,
+          conversation_id: payload.conversation_id ?? null,
+          response: MOCK_HELP_REFERENCE,
+        });
+        return;
+      }
 
       if (!conversation) {
         conversation = createConversation(state, mode, prompt, cleanPrompt);

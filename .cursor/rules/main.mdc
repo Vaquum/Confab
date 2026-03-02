@@ -1,0 +1,8 @@
+---
+alwaysApply: true
+---
+
+- No workarounds. Find the root cause, and fix it.
+- No fallbacks. Let things break and make noise.
+- No silent failures. If something goes wrong, let it break.
+- No swallowing exceptions. If it's caught, it's handled.

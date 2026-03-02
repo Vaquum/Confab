@@ -416,12 +416,81 @@ class ApiServerTestCase(unittest.TestCase):
         self.assertEqual(run_chat_mock.call_args.kwargs['mode'], 'chat')
         self.assertEqual(run_chat_mock.call_args.kwargs['user_id'], 'user-1')
 
+    def test_post_opinions_mode_override_routes_to_doc(self):
+        self._set_auth_override()
+        run_doc_payload = {
+            'chat': 'Document created.',
+            'conversation_id': 'doc-mode-1',
+            'document': '# Draft',
+            'edits': None,
+        }
+        with patch.object(server, 'run_doc', return_value=run_doc_payload) as run_doc_mock:
+            response = self.client.post(
+                '/api/opinions',
+                json={'prompt': 'Create a draft', 'mode': 'doc'},
+            )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body['mode'], 'doc')
+        self.assertEqual(body['conversation_id'], 'doc-mode-1')
+        self.assertEqual(body['document'], '# Draft')
+        self.assertEqual(run_doc_mock.call_args.args[0], 'Create a draft')
+        self.assertEqual(run_doc_mock.call_args.kwargs['mode'], 'doc')
+
     def test_post_opinions_chat_returns_500_on_error(self):
         self._set_auth_override()
         with patch.object(server, 'run_chat', side_effect=RuntimeError('chat failed')):
             response = self.client.post('/api/opinions', json={'prompt': 'Hello'})
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.json()['detail'], 'chat failed')
+
+    def test_post_opinions_help_returns_reference_without_model_call(self):
+        self._set_auth_override()
+        with (
+            patch.object(server, '_load_help_reference', return_value='Help content'),
+            patch.object(server, 'run_chat') as run_chat_mock,
+        ):
+            response = self.client.post('/api/opinions', json={'prompt': '/help'})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['mode'], 'help')
+        self.assertEqual(payload['response'], 'Help content')
+        self.assertIsNone(payload['conversation_id'])
+        run_chat_mock.assert_not_called()
+
+    def test_post_opinions_question_mark_alias_uses_help_mode(self):
+        self._set_auth_override()
+        with (
+            patch.object(server, '_load_help_reference', return_value='Alias help'),
+            patch.object(server, 'run_chat') as run_chat_mock,
+        ):
+            response = self.client.post('/api/opinions', json={'prompt': '/?'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['mode'], 'help')
+        self.assertEqual(response.json()['response'], 'Alias help')
+        self.assertIsNone(response.json()['conversation_id'])
+        run_chat_mock.assert_not_called()
+
+    def test_post_opinions_help_on_existing_conversation_is_not_persisted(self):
+        self._set_auth_override()
+        existing = {
+            'mode': 'chat',
+            'messages': [{'mode': 'chat', 'prompt': 'hello', 'response': 'world'}],
+        }
+        with (
+            patch.object(server, 'get_conversation', return_value=existing),
+            patch.object(server, '_load_help_reference', return_value='Help follow-up'),
+            patch.object(server, 'run_chat') as run_chat_mock,
+        ):
+            response = self.client.post(
+                '/api/opinions',
+                json={'prompt': '/help', 'conversation_id': 'help-1'},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['mode'], 'help')
+        self.assertEqual(response.json()['conversation_id'], 'help-1')
+        self.assertEqual(response.json()['response'], 'Help follow-up')
+        run_chat_mock.assert_not_called()
 
     def test_post_opinions_doc_returns_document_payload(self):
         self._set_auth_override()

@@ -1,5 +1,6 @@
 """Database models and helpers."""
 
+import logging
 import json
 import os
 import uuid
@@ -7,9 +8,11 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, inspect, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 load_dotenv(override=True)
+LOGGER = logging.getLogger(__name__)
 
 
 def _resolve_database_url():
@@ -36,7 +39,18 @@ def _resolve_database_url():
 
 DATABASE_URL = _resolve_database_url()
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+ENGINE_CONFIG = {'pool_pre_ping': True}
+if DATABASE_URL.startswith('postgresql+psycopg://'):
+    ENGINE_CONFIG['connect_args'] = {
+        'connect_timeout': 5,
+        'options': (
+            '-c lock_timeout=5000 '
+            '-c statement_timeout=15000 '
+            '-c idle_in_transaction_session_timeout=15000'
+        ),
+    }
+
+engine = create_engine(DATABASE_URL, **ENGINE_CONFIG)
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
 
@@ -161,8 +175,6 @@ def _migrate_user_id():
         if 'user_id' not in columns:
             conn.execute(text('ALTER TABLE opinions ADD COLUMN user_id TEXT'))
         conn.execute(text("UPDATE opinions SET user_id = 'legacy-local' WHERE user_id IS NULL"))
-        if engine.dialect.name == 'postgresql':
-            conn.execute(text('ALTER TABLE opinions ALTER COLUMN user_id SET NOT NULL'))
         conn.execute(text('CREATE INDEX IF NOT EXISTS ix_opinions_user_id ON opinions (user_id)'))
         conn.execute(
             text(
@@ -172,13 +184,22 @@ def _migrate_user_id():
         )
 
 
+def _run_migration_step(step):
+    try:
+        step()
+    except SQLAlchemyError as exc:
+        LOGGER.warning('Skipping migration %s due to database error: %s', step.__name__, exc)
+
+
 def init_db():
     Base.metadata.create_all(engine)
-    _migrate_db()
-    _migrate_title()
-    _migrate_tokens()
-    _migrate_document()
-    _migrate_user_id()
+    if engine.dialect.name != 'sqlite':
+        return
+    _run_migration_step(_migrate_db)
+    _run_migration_step(_migrate_title)
+    _run_migration_step(_migrate_tokens)
+    _run_migration_step(_migrate_document)
+    _run_migration_step(_migrate_user_id)
 
 
 def save_chat(user_id, conversation_id, position, prompt, response, mode='chat',

@@ -62,6 +62,8 @@ function findDuplicates(values) {
 
 function detectMode(prompt) {
   const normalized = prompt.trim().toLowerCase();
+  if (normalized.startsWith('/help')) return 'help';
+  if (normalized.startsWith('/?')) return 'help';
   if (normalized.startsWith('/doc+')) return 'doc_plus';
   if (normalized.startsWith('/doc')) return 'doc';
   if (normalized.startsWith('/consensus')) return 'consensus';
@@ -133,6 +135,7 @@ function main() {
 
   const requiredModes = new Set([
     'chat',
+    'help',
     'gpt',
     'grok',
     'gemini',

@@ -51,7 +51,11 @@ for (const scenario of MODE_MATRIX_CASES) {
     await expect(page.locator('#messageContainer')).toContainText(
       scenario.expectedResponseText,
     );
-    await expect(page.locator('#chatList')).toContainText(scenario.expectedModeBadge);
+    if (scenario.persistsConversation === false) {
+      await expect(page.locator('#chatList .chat-item')).toHaveCount(0);
+    } else if (scenario.expectedModeBadge) {
+      await expect(page.locator('#chatList')).toContainText(scenario.expectedModeBadge);
+    }
 
     if (scenario.opensDocPane) {
       await expect(page.locator('#docPane')).toHaveClass(/open/);

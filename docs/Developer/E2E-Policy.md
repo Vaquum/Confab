@@ -46,6 +46,7 @@ Must validate:
 - First response renders
 - Correct mode badge/history behavior
 - Mode-specific critical UI (for example doc pane or doc+ wizard)
+- Mode alias behavior where supported (for example `/help` and `/?` resolving to `help`)
 
 ### Layer 2: Journey Specs
 
@@ -71,7 +72,7 @@ Requirements:
 - Every `e2e/*.spec.ts` file must have one `CORE_PATHS` owner entry.
 - Every owner entry must point to a real spec file.
 - `MODE_MATRIX_CASES` must cover all required modes:
-  - `chat`, `gpt`, `grok`, `gemini`, `doc`, `doc_plus`, `consensus`, `pr`
+  - `chat`, `help`, `gpt`, `grok`, `gemini`, `doc`, `doc_plus`, `consensus`, `pr`
 
 Automated enforcement:
 

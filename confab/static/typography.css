@@ -1,18 +1,25 @@
-/*
- * Typography — Confab
- * Controls all rendered markdown styling.
- * Tune via the settings panel or edit this file directly.
- */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;600&family=Lato:wght@300;400;600&family=Manrope:wght@300;400;600&family=Nunito:wght@300;400;600&family=Playfair+Display:wght@400;600&family=Rajdhani:wght@300;400;600&family=Rubik:wght@300;400;600&family=Space+Grotesk:wght@300;400;600&family=Syne:wght@400;600&family=Work+Sans:wght@300;400;600&display=swap');
 
 :root {
-  --prose-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --prose-font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --prose-body-weight: 400;
   --prose-font-size: 15px;
   --prose-line-height: 1.75;
   --prose-color: #1c1917;
   --prose-heading-weight: 600;
+  --prose-heading-font-family: "Rajdhani", "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --prose-h1-weight: 600;
+  --prose-h2-weight: 400;
+  --prose-h3-weight: 300;
+  --prose-h4-weight: 300;
+  --prose-heading-line-height: 1.3;
+  --prose-h1-size: 22.5px;
+  --prose-h2-size: 18.75px;
+  --prose-h3-size: 16.5px;
+  --prose-h4-size: 15px;
   --prose-heading-letter-spacing: -0.02em;
   --prose-heading-scale: 1;
-  --prose-heading-margin-top: 2em;
+  --prose-heading-margin-bottom: 0.6em;
   --prose-heading-color: #0c0a09;
   --prose-paragraph-spacing: 1.15em;
   --prose-list-indent: 1.5em;
@@ -28,6 +35,7 @@
 
 .prose {
   font-family: var(--prose-font-family);
+  font-weight: var(--prose-body-weight, 400);
   font-size: var(--prose-font-size);
   line-height: var(--prose-line-height);
   color: var(--prose-color);
@@ -42,11 +50,12 @@
 .prose h3,
 .prose h4 {
   font-weight: var(--prose-heading-weight);
+  font-family: var(--prose-heading-font-family, var(--prose-font-family));
   letter-spacing: var(--prose-heading-letter-spacing);
   color: var(--prose-heading-color);
-  margin-top: var(--prose-heading-margin-top);
-  margin-bottom: 0.6em;
-  line-height: 1.3;
+  margin-top: 1.25em;
+  margin-bottom: var(--prose-heading-margin-bottom);
+  line-height: var(--prose-heading-line-height);
 }
 
 .prose h1:first-child,
@@ -56,10 +65,13 @@
   margin-top: 0;
 }
 
-.prose h1 { font-size: calc(1.5em * var(--prose-heading-scale)); }
-.prose h2 { font-size: calc(1.25em * var(--prose-heading-scale)); }
-.prose h3 { font-size: calc(1.1em * var(--prose-heading-scale)); }
-.prose h4 { font-size: calc(1em * var(--prose-heading-scale)); font-weight: 500; }
+.prose h1 { font-size: var(--prose-h1-size, calc(1.5em * var(--prose-heading-scale))); }
+.prose h2 { font-size: var(--prose-h2-size, calc(1.25em * var(--prose-heading-scale))); }
+.prose h3 { font-size: var(--prose-h3-size, calc(1.1em * var(--prose-heading-scale))); }
+.prose h1 { font-weight: var(--prose-h1-weight, var(--prose-heading-weight)); }
+.prose h2 { font-weight: var(--prose-h2-weight, var(--prose-heading-weight)); }
+.prose h3 { font-weight: var(--prose-h3-weight, var(--prose-heading-weight)); }
+.prose h4 { font-size: var(--prose-h4-size, calc(1em * var(--prose-heading-scale))); font-weight: var(--prose-h4-weight, 500); }
 
 /* --- Paragraphs --- */
 

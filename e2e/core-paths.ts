@@ -48,8 +48,9 @@ export type ModeMatrixCase = {
   id: string;
   prompt: string;
   sendWith: SendMethod;
-  expectedModeBadge: string;
+  expectedModeBadge?: string;
   expectedResponseText: string;
+  persistsConversation?: boolean;
   opensDocPane?: boolean;
   requiresDocPlusWizard?: boolean;
 };
@@ -61,6 +62,13 @@ export const MODE_MATRIX_CASES: ModeMatrixCase[] = [
     sendWith: 'enter',
     expectedModeBadge: 'chat',
     expectedResponseText: 'Mock chat response for: Give me a quick status update',
+  },
+  {
+    id: 'help-prefix',
+    prompt: '/help',
+    sendWith: 'enter',
+    expectedResponseText: 'Confab Modes Reference',
+    persistsConversation: false,
   },
   {
     id: 'gpt-prefix',

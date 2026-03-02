@@ -83,11 +83,6 @@ def _to_gemini_contents(messages):
     return contents
 
 
-def _is_timeout_error(exc):
-    text = str(exc).strip().lower()
-    return 'timed out' in text or 'timeout' in text
-
-
 def _generate_gemini_response(
     client,
     messages,
@@ -115,25 +110,14 @@ def query_gemini(api_key, messages):
         api_key=api_key,
         http_options=types.HttpOptions(timeout=timeout_ms),
     )
-    try:
-        response = _generate_gemini_response(
-            client=client,
-            messages=messages,
-            max_output_tokens=GEMINI_MAX_OUTPUT_TOKENS,
-            include_thoughts=GEMINI_INCLUDE_THOUGHTS,
-            thinking_budget=GEMINI_THINKING_BUDGET,
-        )
-    except Exception as exc:
-        if not _is_timeout_error(exc):
-            raise
-        fallback_max_tokens = min(GEMINI_MAX_OUTPUT_TOKENS, 1024)
-        response = _generate_gemini_response(
-            client=client,
-            messages=messages,
-            max_output_tokens=fallback_max_tokens,
-            include_thoughts=False,
-            thinking_budget=0,
-        )
+    response = _generate_gemini_response(
+        client=client,
+        messages=messages,
+        max_output_tokens=GEMINI_MAX_OUTPUT_TOKENS,
+        include_thoughts=GEMINI_INCLUDE_THOUGHTS,
+        thinking_budget=GEMINI_THINKING_BUDGET,
+    )
+
     meta = getattr(response, 'usage_metadata', None)
     usage = {
         'input': getattr(meta, 'prompt_token_count', None) if meta else None,
