@@ -93,7 +93,7 @@ Internal module flow:
 ## Interaction with Refactored Frontend
 
 - CLI is backend-only and does not require `frontend/src/` build artifacts.
-- Frontend bundling (`npm run check:frontend`) is independent from CLI execution.
+- Frontend bundling (`pnpm run check:frontend`) is independent from CLI execution.
 
 ## Examples
 

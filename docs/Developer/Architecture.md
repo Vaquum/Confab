@@ -50,6 +50,12 @@ This document describes the maintainable base refactor layout and developer boun
   - `GET /typography.css`
   - `GET /app/{asset_path:path}`
 
+### Tooling
+
+- Workspace package manager: `pnpm` (`pnpm-workspace.yaml`).
+- Task orchestration: Turborepo (`turbo.json`), executed with `pnpm turbo run ...`.
+- Python dependency/runtime tooling: `uv` with lockfile `uv.lock`.
+
 ## Request Flow
 
 1. Browser calls API routes in `confab/server.py`.
@@ -89,12 +95,11 @@ Local quality gate commands:
 
 ```bash
 source venv/bin/activate
-python -m compileall confab tests
-ruff check confab tests
-pyright confab/config confab/providers confab/services confab/core.py
-npm run check:frontend
-python tests/run.py
-npm run e2e
+pnpm run py:sync
+pnpm run py:quality
+pnpm run check:frontend
+pnpm run py:tests
+pnpm run e2e
 ```
 
 CI workflows:

@@ -4,18 +4,30 @@
   "scripts": {
     "e2e:policy": "node e2e/check-core-paths.mjs",
     "e2e": "playwright test",
-    "e2e:matrix": "npm run e2e:policy && playwright test e2e/mode-matrix.spec.ts",
+    "e2e:matrix": "pnpm run e2e:policy && playwright test e2e/mode-matrix.spec.ts",
     "e2e:headed": "playwright test --headed",
     "e2e:ui": "playwright test --ui",
     "e2e:debug": "playwright test --debug",
     "build:frontend": "vite build",
     "typecheck:frontend": "tsc -p tsconfig.frontend.json --noEmit",
-    "check:frontend": "npm run typecheck:frontend && npm run build:frontend"
+    "py:sync": "UV_PROJECT_ENVIRONMENT=venv uv sync --extra dev",
+    "py:compile": "UV_PROJECT_ENVIRONMENT=venv uv run python -m compileall confab tests",
+    "py:lint": "UV_PROJECT_ENVIRONMENT=venv uv run ruff check confab tests",
+    "py:type": "UV_PROJECT_ENVIRONMENT=venv uv run pyright confab/config confab/providers confab/services confab/core.py",
+    "py:quality": "pnpm run py:compile && pnpm run py:lint && pnpm run py:type",
+    "py:tests": "UV_PROJECT_ENVIRONMENT=venv uv run python -u tests/run.py",
+    "check:frontend": "pnpm run typecheck:frontend && pnpm run build:frontend",
+    "turbo:quality": "turbo run py:quality check:frontend",
+    "turbo:frontend": "turbo run check:frontend",
+    "turbo:e2e-smoke": "turbo run e2e:policy e2e:matrix",
+    "turbo:python-tests": "turbo run py:tests"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@types/node": "^25.3.3",
+    "turbo": "^2.8.12",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
-  }
+  },
+  "packageManager": "pnpm@10.6.1"
 }

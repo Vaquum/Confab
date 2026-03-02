@@ -1,0 +1,29 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "py:quality": {
+      "outputs": [],
+      "cache": false
+    },
+    "py:tests": {
+      "outputs": [],
+      "cache": false
+    },
+    "check:frontend": {
+      "outputs": ["confab/static/app/**"]
+    },
+    "e2e:policy": {
+      "outputs": []
+    },
+    "e2e:matrix": {
+      "dependsOn": ["e2e:policy"],
+      "outputs": ["playwright-report/**", "test-results/**"],
+      "cache": false
+    },
+    "e2e": {
+      "dependsOn": ["e2e:policy"],
+      "outputs": ["playwright-report/**", "test-results/**"],
+      "cache": false
+    }
+  }
+}

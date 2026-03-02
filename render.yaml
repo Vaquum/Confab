@@ -5,8 +5,8 @@ services:
     region: frankfurt
     plan: starter
     autoDeploy: true
-    buildCommand: pip install -e . && python -m compileall confab
-    startCommand: uvicorn confab.server:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install uv && UV_PROJECT_ENVIRONMENT=.venv uv sync --locked --no-dev && .venv/bin/python -m compileall confab
+    startCommand: .venv/bin/uvicorn confab.server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /
     envVars:
       - key: PYTHON_VERSION

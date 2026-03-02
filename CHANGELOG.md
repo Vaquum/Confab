@@ -423,3 +423,30 @@
 - Refactor `parse_mode` in `confab/domain/modes.py` to remove excessive early returns while preserving all mode prefix behavior.
 - Simplify explicit mode-override routing in `confab/server.py` to a single combined condition for Ruff `SIM102` compliance.
 - Restore PR quality-gate compatibility by clearing Ruff failures in both standalone Ruff and full quality workflows.
+
+## v0.7.41 on 2nd of March, 2026
+
+- Add root migration plan `migration-path.md` with phased delivery for monorepo tooling, strict TS/Vitest, `pytest` + `mypy`, and Alembic/observability rollout.
+- Add `pnpm` workspace and Turborepo baseline via `pnpm-workspace.yaml`, `turbo.json`, and `package.json` updates (including `packageManager` and `turbo` tooling scripts).
+- Replace `npm` workflow execution in CI and local docs with `pnpm`, and route frontend/e2e smoke orchestration in CI through `pnpm turbo run ...`.
+- Replace `package-lock.json` with `pnpm-lock.yaml` for deterministic Node dependency resolution under the new package-manager standard.
+
+## v0.7.42 on 2nd of March, 2026
+
+- Restructure `migration-path.md` into explicit next-phase sequencing that separates Python toolchain standardization (`uv`) from async backend runtime migration.
+- Define PR2 to standardize Python task execution under Turbo via `package.json` scripts that call `uv run ...`, with dependency locking through `uv.lock`.
+- Define PR5 as async-only FastAPI execution migration (async routes, SQLAlchemy async engine/session, `asyncpg`, and no sync DB calls on async request paths).
+
+## v0.7.43 on 2nd of March, 2026
+
+- Add Python toolchain lockfile `uv.lock` and wire `uv` into repository workflows as the standard Python dependency/runtime manager for local and CI paths.
+- Add `py:*` task scripts in `package.json` (`py:sync`, `py:quality`, `py:tests`, and supporting compile/lint/type commands) so Turbo/PNPM orchestrate Python checks through `uv run ...`.
+- Update quality, tests, and Playwright GitHub workflows to initialize `uv` and execute Python setup/checks via the new script surface instead of direct `pip install` command chains.
+- Update developer docs (`docs/Developer/Get-Started.md`, `docs/Developer/Mode-Development.md`, and `docs/Developer/Architecture.md`) to reflect `uv`-backed Python workflow and `venv`-scoped execution model.
+- Update `migration-path.md` status to mark PR2 complete and keep PR3+ sequencing explicit.
+
+## v0.7.44 on 2nd of March, 2026
+
+- Update Render Blueprint `render.yaml` to use locked `uv` dependency sync (`uv.lock`) during build so cloud delivery matches the repository Python toolchain model.
+- Update Render start command to run `uvicorn` from the blueprint-created `.venv` environment for consistent runtime resolution.
+- Update Render deployment section in `docs/Developer/Get-Started.md` to mirror the new build and start commands.
