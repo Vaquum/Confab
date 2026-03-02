@@ -100,10 +100,17 @@ Resend sending records must show as verified for external delivery.
 
 ```bash
 source venv/bin/activate
-uvicorn confab.server:app --reload
+make dev
 ```
 
 Open `http://localhost:8000`.
+
+Direct command equivalent:
+
+```bash
+source venv/bin/activate
+uvicorn confab.server:app --reload --timeout-graceful-shutdown 2
+```
 
 Alternative package-local startup (when your shell is inside `confab/`):
 

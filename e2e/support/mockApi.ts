@@ -274,10 +274,11 @@ export async function installMockApi(
         prompt?: string;
         conversation_id?: string | null;
         doc_plus_context?: string | null;
+        mode?: ChatMode | null;
       };
       const prompt = (payload.prompt ?? '').trim();
       const parsed = parseMode(prompt);
-      const requestedMode = parsed.mode;
+      const requestedMode = payload.mode ?? parsed.mode;
       const cleanPrompt = parsed.cleanPrompt || prompt;
 
       let conversation: Conversation | undefined;
@@ -285,6 +286,15 @@ export async function installMockApi(
         conversation = state.conversations.get(payload.conversation_id) ?? undefined;
       }
       const mode = requestedMode ?? conversation?.mode ?? 'chat';
+
+      if (mode === 'help') {
+        await jsonResponse(route, {
+          mode,
+          conversation_id: payload.conversation_id ?? null,
+          response: MOCK_HELP_REFERENCE,
+        });
+        return;
+      }
 
       if (!conversation) {
         conversation = createConversation(state, mode, prompt, cleanPrompt);
@@ -383,20 +393,6 @@ export async function installMockApi(
           conversation_id: conversation.conversation_id,
           response: 'Document ready.',
           document: newDocument,
-        });
-        return;
-      }
-
-      if (mode === 'help') {
-        appendMessage(state, conversation, {
-          mode,
-          prompt,
-          response: MOCK_HELP_REFERENCE,
-        });
-        await jsonResponse(route, {
-          mode,
-          conversation_id: conversation.conversation_id,
-          response: MOCK_HELP_REFERENCE,
         });
         return;
       }

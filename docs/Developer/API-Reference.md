@@ -250,7 +250,8 @@ Primary prompt endpoint for chat, help, doc, doc-plus, consensus, and PR review.
 {
   "prompt": "Your prompt (optionally prefixed with /help, /?, /doc, /doc+, /consensus, /pr, @gpt, @grok, @gemini, @claude)",
   "conversation_id": "optional-uuid",
-  "doc_plus_context": "required for first /doc+ turn; omitted for follow-ups"
+  "doc_plus_context": "required for first /doc+ turn; omitted for follow-ups",
+  "mode": "optional explicit mode override used by frontend mode-lock"
 }
 ```
 
@@ -267,7 +268,9 @@ Primary prompt endpoint for chat, help, doc, doc-plus, consensus, and PR review.
   - Existing conversation: inherits conversation context/mode rules
   - New conversation: defaults to `chat` (Claude)
 - Existing conversation mode lock currently applies to:
-  - `consensus`, `pr`, `doc`, `doc_plus`, `help`
+  - `consensus`, `pr`, `doc`, `doc_plus`
+- If request body includes `mode`, backend validates and honors it as an explicit route override.
+  - This is used by frontend mode-lock so stripped prefixes still route correctly.
 
 ### JSON Response Modes
 
@@ -286,13 +289,14 @@ For `help`:
 ```json
 {
   "mode": "help",
-  "conversation_id": "uuid",
+  "conversation_id": null,
   "response": "# Confab Reference\n..."
 }
 ```
 
 - Help mode returns the current `docs/User/Modes.md` content.
 - Help mode does not call model providers.
+- Help mode is ephemeral and is not persisted into conversation history.
 
 For `doc`:
 

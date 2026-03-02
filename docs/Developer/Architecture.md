@@ -42,6 +42,9 @@ This document describes the maintainable base refactor layout and developer boun
   - `gui.js`
   - `gui.css`
 - HTML shell: `confab/static/gui.html`
+- Typography source: `confab/static/typography.css`
+  - Hosts shared content typography variables and loaded Google Fonts.
+  - Includes the shared monospace family (`IBM Plex Mono`) used by UI monospace surfaces.
 - Public static routes:
   - `GET /`
   - `GET /typography.css`
@@ -69,7 +72,7 @@ When adding or changing modes, keep these files aligned:
 Current special-mode behavior:
 
 - `/help` and `/?` map to `help` mode and return `docs/User/Modes.md` directly.
-- `help` mode is persisted and conversation-locked on follow-up turns.
+- `help` mode is ephemeral (not persisted) and should not alter long-term conversation mode state.
 
 ## Development Rules
 

@@ -9,6 +9,7 @@ class PromptRequest(BaseModel):
     prompt: str
     conversation_id: str | None = None
     doc_plus_context: str | None = None
+    mode: str | None = None
 
 
 class RenameRequest(BaseModel):

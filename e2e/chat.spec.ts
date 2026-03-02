@@ -63,3 +63,41 @@ test('loads history, sends chat prompts, renames and deletes conversations', asy
   await page.locator('.chat-item-delete').first().click({ force: true });
   await expect(page.locator('#chatList')).toContainText('No chats yet.');
 });
+
+test('rehydrates history after transient empty first load', async ({ page }) => {
+  await installSupabaseMock(page, { authenticated: true, email: 'qa@example.com' });
+  await installMockApi(page, {
+    seedConversations: [
+      {
+        conversation_id: 'pw-seed-hydrate',
+        mode: 'chat',
+        title: 'Hydration thread',
+        prompt: 'Hydration seed prompt',
+        response: 'Hydration seed response',
+      },
+    ],
+  });
+
+  let interceptedHistoryCalls = 0;
+  await page.route('**/api/opinions', async (route, request) => {
+    const url = new URL(request.url());
+    if (request.method() !== 'GET' || url.pathname !== '/api/opinions') {
+      await route.fallback();
+      return;
+    }
+    if (interceptedHistoryCalls === 0) {
+      interceptedHistoryCalls += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json; charset=utf-8',
+        body: '[]',
+      });
+      return;
+    }
+    await route.fallback();
+  });
+
+  await page.goto('/');
+  await expect(page.locator('#authGate')).toBeHidden();
+  await expect(page.locator('#chatList')).toContainText('Hydration thread');
+});

@@ -4,7 +4,6 @@ import json
 import mimetypes
 import os
 import sys
-import uuid
 from importlib.resources import files
 from pathlib import Path
 
@@ -37,7 +36,6 @@ if __package__:
         get_user_settings,
         list_conversations,
         rename_conversation,
-        save_chat,
         save_user_settings,
         update_latest_document,
     )
@@ -70,7 +68,6 @@ else:
         get_user_settings,
         list_conversations,
         rename_conversation,
-        save_chat,
         save_user_settings,
         update_latest_document,
     )
@@ -366,6 +363,20 @@ def api_save_settings(req: SettingsRequest, user=Depends(get_current_user)):
 def api_create_opinion(req: PromptRequest, user=Depends(get_current_user)):
     user_id = user['id']
     mode, clean_prompt = parse_mode(req.prompt)
+    mode_override = (req.mode or '').strip().lower() or None
+    if mode_override:
+        if mode_override in (
+            'chat',
+            'gpt',
+            'grok',
+            'gemini',
+            'consensus',
+            'pr',
+            'doc',
+            'doc_plus',
+            'help',
+        ):
+            mode = mode_override
 
     conversation_id = req.conversation_id
     existing_conversation = None
@@ -377,7 +388,6 @@ def api_create_opinion(req: PromptRequest, user=Depends(get_current_user)):
                 'pr',
                 'doc',
                 'doc_plus',
-                'help',
             ):
                 mode = existing_conversation['mode']
                 clean_prompt = parse_mode(req.prompt)[1]
@@ -387,30 +397,17 @@ def api_create_opinion(req: PromptRequest, user=Depends(get_current_user)):
                     if existing_conversation['messages']
                     else None
                 )
-                mode = last_msg.get('mode', 'chat') if last_msg else 'chat'
+                last_mode = last_msg.get('mode', 'chat') if last_msg else 'chat'
+                mode = 'chat' if last_mode == 'help' else last_mode
 
     if mode is None:
         mode = 'chat'
 
     if mode == 'help':
         response = _load_help_reference()
-        target_conversation_id = conversation_id or str(uuid.uuid4())
-        position = (
-            len(existing_conversation['messages'])
-            if existing_conversation and existing_conversation.get('messages')
-            else 0
-        )
-        save_chat(
-            user_id,
-            target_conversation_id,
-            position,
-            req.prompt.strip(),
-            response,
-            mode='help',
-        )
         return {
             'mode': 'help',
-            'conversation_id': target_conversation_id,
+            'conversation_id': conversation_id,
             'response': response,
         }
 

@@ -22,6 +22,7 @@ There are two kinds of prefix: `@` and `/`.
 - `/consensus`: ask all four modes and get synthesized answer.
 - `/pr <github-pr-url>`: get a pull-request review.
 - `/help` or `/?`: show this reference.
+  - Help is shown instantly and is not saved to chat history.
 
 **NOTE:** `/doc` and `/doc+` modes enable collaborative document editing with the model. 
 

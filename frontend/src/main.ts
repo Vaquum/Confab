@@ -341,6 +341,8 @@ const DOC_PLUS_LEVELS = [
   },
 ];
 const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
+const THEME_SETTINGS_KEY = 'theme';
+const THEME_LOCAL_STORAGE_KEY = 'confab_theme';
 const SUPPORTED_ATTACHMENT_EXTENSIONS = new Set(['txt', 'csv', 'tsv', 'md']);
 const MODE_LOCK_TOKENS: ComposerModeLock[] = [
   { token: '/help', mode: 'help' },
@@ -357,8 +359,12 @@ const MODE_LOCK_TOKENS: ComposerModeLock[] = [
 const MODE_LOCK_LEFT_OFFSET_PX = 40;
 const MODE_LOCK_CURSOR_GAP_PX = 7;
 const MIN_INPUT_LEFT_PADDING_PX = 46;
+const COMPOSER_MULTILINE_SCROLL_THRESHOLD_PX = 50;
+const COMPOSER_MULTILINE_PADDING_BOTTOM_PX = 38;
 const DOC_HIGHLIGHT_BLOCK_SELECTOR =
   'p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, code, td, th';
+const HISTORY_EMPTY_RETRY_LIMIT = 3;
+const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
 
   let currentConversationId = null;
   let currentMode = null;
@@ -375,12 +381,102 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
   let docPlusSelections = {};
   let pendingAttachments: PendingAttachment[] = [];
   let composerModeLock: ComposerModeLock | null = null;
+  let historyRetryTimer = null;
+  let historyEmptyRetryCount = 0;
   let persistedUserSettings = {};
+  let currentTheme = 'light';
 
   function renderAllowedDomainBadge() {
     const badge = document.getElementById('allowedDomainBadge');
     if (!badge) return;
     badge.textContent = `@${ALLOWED_EMAIL_DOMAIN}`;
+  }
+
+  function normalizeTheme(theme) {
+    if (theme === 'light' || theme === 'dark') {
+      return theme;
+    }
+    return null;
+  }
+
+  function readLocalThemePreference() {
+    try {
+      return normalizeTheme(window.localStorage.getItem(THEME_LOCAL_STORAGE_KEY));
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function writeLocalThemePreference(theme) {
+    try {
+      window.localStorage.setItem(THEME_LOCAL_STORAGE_KEY, theme);
+    } catch (_error) {
+      // Ignore storage access failures.
+    }
+  }
+
+  function resolveSystemTheme() {
+    return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+      ? 'dark'
+      : 'light';
+  }
+
+  function resolvePreferredTheme(settings) {
+    const fromSettings = normalizeTheme(settings?.[THEME_SETTINGS_KEY]);
+    if (fromSettings) {
+      return fromSettings;
+    }
+    const fromLocal = readLocalThemePreference();
+    if (fromLocal) {
+      return fromLocal;
+    }
+    return resolveSystemTheme();
+  }
+
+  function applyTheme(theme) {
+    const normalizedTheme = normalizeTheme(theme) || 'light';
+    currentTheme = normalizedTheme;
+    document.documentElement.setAttribute('data-theme', normalizedTheme);
+    const button = document.getElementById('btnTheme');
+    if (!button) {
+      return;
+    }
+    const nextThemeLabel = normalizedTheme === 'dark'
+      ? 'Switch to light mode'
+      : 'Switch to dark mode';
+    button.setAttribute('title', nextThemeLabel);
+    button.setAttribute('aria-label', nextThemeLabel);
+    button.classList.toggle('active', normalizedTheme === 'dark');
+  }
+
+  async function saveThemePreference(theme) {
+    writeLocalThemePreference(theme);
+    if (!authSession) {
+      return;
+    }
+    const nextSettings = Object.assign({}, persistedUserSettings, {
+      [THEME_SETTINGS_KEY]: theme,
+    });
+    try {
+      await apiFetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: nextSettings }),
+      });
+      persistedUserSettings = nextSettings;
+    } catch (e) {
+      console.error('Failed to save settings', e);
+    }
+  }
+
+  async function toggleTheme() {
+    const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme);
+    const currentTypography = readTypoInputs();
+    const themeAwareTypography = resolveTypographyColorsForTheme(currentTypography);
+    applyTypography(themeAwareTypography);
+    populateTypoInputs(themeAwareTypography);
+    await saveThemePreference(nextTheme);
   }
 
   function renderComposerModeLock() {
@@ -434,8 +530,10 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
 
   // --- Init ---
   renderAllowedDomainBadge();
+  applyTheme(resolvePreferredTheme(persistedUserSettings));
   renderAttachmentList();
   renderComposerModeLock();
+  autoResize(document.getElementById('input'));
   setComposerCentered(true);
   initDocPlusWizard();
   initAuth();
@@ -475,7 +573,11 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
     syncComposerPlacement();
 
     if (authSession) {
-      await initTypography();
+      try {
+        await initTypography();
+      } catch (e) {
+        console.error('Failed to initialize typography settings', e);
+      }
       await loadHistory();
     } else {
       renderHistory([]);
@@ -488,13 +590,18 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
       if (session) {
         setAuthStatus('');
         syncComposerPlacement();
-        await initTypography();
+        try {
+          await initTypography();
+        } catch (e) {
+          console.error('Failed to initialize typography settings', e);
+        }
         await loadHistory();
       } else {
         persistedUserSettings = {};
         currentConversationId = null;
         currentMode = null;
         currentDocument = null;
+        historyEmptyRetryCount = 0;
         clearComposerModeLock();
         pendingAttachments = [];
         renderAttachmentList();
@@ -575,7 +682,12 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
     const headers = Object.assign({}, options.headers || {}, {
       Authorization: `Bearer ${token}`,
     });
-    const response = await fetch(url, Object.assign({}, options, { headers }));
+    const method = String(options.method || 'GET').toUpperCase();
+    const requestOptions = Object.assign({}, options, { headers });
+    if (method === 'GET' && requestOptions.cache === undefined) {
+      requestOptions.cache = 'no-store';
+    }
+    const response = await fetch(url, requestOptions);
     if (response.status === 401) {
       await signOut();
       throw new Error('Session expired. Please sign in again.');
@@ -930,6 +1042,10 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
 
   // --- History ---
   async function loadHistory() {
+    if (historyRetryTimer) {
+      clearTimeout(historyRetryTimer);
+      historyRetryTimer = null;
+    }
     if (!authReady || !authSession) {
       renderHistory([]);
       return;
@@ -937,9 +1053,34 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
     try {
       const res = await apiFetch("/api/opinions");
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.detail || "Failed to load history");
+      }
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid history payload");
+      }
+      if (
+        data.length === 0 &&
+        historyEmptyRetryCount < HISTORY_EMPTY_RETRY_LIMIT &&
+        !currentConversationId
+      ) {
+        historyEmptyRetryCount += 1;
+        historyRetryTimer = setTimeout(() => {
+          historyRetryTimer = null;
+          void loadHistory();
+        }, HISTORY_EMPTY_RETRY_DELAY_MS);
+      } else {
+        historyEmptyRetryCount = 0;
+      }
       renderHistory(data);
     } catch (e) {
       console.error("Failed to load history", e);
+      if (authReady && authSession) {
+        historyRetryTimer = setTimeout(() => {
+          historyRetryTimer = null;
+          void loadHistory();
+        }, 1200);
+      }
     }
   }
 
@@ -1335,7 +1476,7 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
 
     if (edits.length > 1) {
       html += `<div style="display:flex; justify-content:flex-end; padding-top:4px;">
-        <button class="btn-accept" style="font-size:12px; padding:5px 14px; border-radius:6px; border:1px solid #166534; cursor:pointer;"
+        <button class="btn-accept btn-accept-all"
                 onclick="acceptAllEdits('${batchId}', ${edits.length})">Accept All</button>
       </div>`;
     }
@@ -1528,8 +1669,10 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
     document.getElementById("welcome").style.display = "none";
     document.getElementById("messages").style.display = "none";
     document.getElementById("messageContainer").innerHTML = "";
-    document.getElementById("input").value = "";
-    document.getElementById("input").focus();
+    const input = document.getElementById("input");
+    input.value = "";
+    autoResize(input);
+    input.focus();
     if (docPaneOpen) closeDocPane();
     loadHistory();
   }
@@ -1750,6 +1893,8 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
     const input = document.getElementById("input");
     const rawPrompt = input.value.trim();
     const attachmentsForSend = pendingAttachments.slice();
+    const previousConversationId = currentConversationId;
+    const previousMode = currentMode;
     if ((!rawPrompt && attachmentsForSend.length === 0) || loading || !authSession) return;
     const prompt = buildPromptWithAttachments(rawPrompt, attachmentsForSend);
 
@@ -1828,6 +1973,7 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
           prompt,
           conversation_id: requestConversationId,
           doc_plus_context: docPlusContext,
+          mode,
         }),
       });
 
@@ -1893,8 +2039,13 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || "Request failed");
 
-        currentConversationId = data.conversation_id;
-        currentMode = data.mode;
+        if (data.mode === 'help') {
+          currentConversationId = previousConversationId;
+          currentMode = previousMode;
+        } else {
+          currentConversationId = data.conversation_id;
+          currentMode = data.mode;
+        }
 
         const thinking = document.getElementById("thinkingBlock");
         if (thinking) thinking.remove();
@@ -2010,11 +2161,41 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
   }
 
   function autoResize(el) {
+    const inputWrap = el.closest('.input-wrap');
+    if (inputWrap) {
+      inputWrap.classList.remove('multiline');
+    }
+    el.style.height = "auto";
+    const baseScrollHeight = el.scrollHeight;
+    const hasExplicitLineBreak = el.value.includes('\n');
+    const isMultiline = hasExplicitLineBreak || (
+      baseScrollHeight > COMPOSER_MULTILINE_SCROLL_THRESHOLD_PX
+    );
+    if (inputWrap) {
+      inputWrap.classList.toggle('multiline', isMultiline);
+    }
+
     el.style.height = "auto";
     const max = 160;
-    const h = Math.min(el.scrollHeight, max);
+    const fullScrollHeight = el.scrollHeight;
+    const lineHeight = parseFloat(window.getComputedStyle(el).lineHeight) || 20;
+    const paddingTop = parseFloat(window.getComputedStyle(el).paddingTop) || 0;
+    const explicitLineCount = hasExplicitLineBreak
+      ? el.value.split('\n').length
+      : 0;
+    const explicitLineHeightEstimate = explicitLineCount
+      ? (explicitLineCount * lineHeight) + paddingTop + COMPOSER_MULTILINE_PADDING_BOTTOM_PX
+      : 0;
+    const effectiveScrollHeight = Math.max(
+      fullScrollHeight,
+      explicitLineHeightEstimate,
+    );
+    const h = Math.min(effectiveScrollHeight, max);
     el.style.height = h + "px";
-    el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
+    el.style.overflowY = effectiveScrollHeight > max ? "auto" : "hidden";
+    if (composerModeLock) {
+      renderComposerModeLock();
+    }
   }
 
   function esc(s) {
@@ -2070,32 +2251,132 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
   // =========================================================
 
   const TYPO_DEFAULTS = {
-    fontFamily: "system",
+    fontFamily: "engineer",
     fontSize: 15,
     lineHeight: 1.75,
     headingWeight: 600,
+    headingLineHeight: 1.3,
     headingLetterSpacing: -0.02,
     headingScale: 1,
     contentWidth: 720,
     paragraphSpacing: 1.15,
-    headingMarginTop: 2,
+    headingGap: 0.6,
     listIndent: 1.5,
     codeFontSize: 0.875,
     codeBlockRadius: 8,
-    textColor: "#1c1917",
-    headingColor: "#0c0a09",
+    textColor: "#121212",
+    headingColor: "#121212",
     linkColor: "#44403c",
     blockquoteBorderColor: "#d6d3d1",
     blockquoteTextColor: "#57534e",
   };
 
-  const FONT_STACKS = {
-    system: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
-    georgia: 'Georgia, "Times New Roman", serif',
-    palatino: '"Palatino Linotype", Palatino, "Book Antiqua", serif',
-    charter: 'Charter, "Bitstream Charter", "Sitka Text", Cambria, serif',
-    mono: '"SF Mono", "Fira Code", Menlo, Consolas, monospace',
+  const TYPO_LIGHT_COLOR_DEFAULTS = {
+    textColor: "#121212",
+    headingColor: "#121212",
+    linkColor: "#44403c",
+    blockquoteBorderColor: "#d6d3d1",
+    blockquoteTextColor: "#57534e",
   };
+
+  const TYPO_DARK_COLOR_DEFAULTS = {
+    textColor: "#F3F3F3",
+    headingColor: "#F8F8F8",
+    linkColor: "#C4E8F4",
+    blockquoteBorderColor: "#444444",
+    blockquoteTextColor: "#D3D3D3",
+  };
+
+  const TYPO_LIGHT_COLOR_ALIASES = {
+    textColor: new Set(["#121212", "#1c1917"]),
+    headingColor: new Set(["#121212", "#0c0a09"]),
+    linkColor: new Set(["#44403c"]),
+    blockquoteBorderColor: new Set(["#d6d3d1"]),
+    blockquoteTextColor: new Set(["#57534e"]),
+  };
+
+  const TYPO_ARCHETYPES = {
+    engineer: {
+      body: '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+      heading: '"Rajdhani", "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+    },
+    editor: {
+      body: '"Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+      heading: '"Playfair Display", "Lato", Georgia, "Times New Roman", serif',
+    },
+    minimalist: {
+      body: '"Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+      heading: '"Space Grotesk", "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+    },
+    companion: {
+      body: '"Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+      heading: '"Rubik", "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+    },
+    auteur: {
+      body: '"Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+      heading: '"Syne", "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+    },
+  };
+
+  const TYPO_HEADING_BASE_SIZES = {
+    h1: 22.5,
+    h2: 18.75,
+    h3: 16.5,
+    h4: 15,
+  };
+
+  function normalizeTypoSettings(settings) {
+    const normalized = Object.assign({}, TYPO_DEFAULTS, settings || {});
+    if (!TYPO_ARCHETYPES[normalized.fontFamily]) {
+      normalized.fontFamily = TYPO_DEFAULTS.fontFamily;
+    }
+    if (
+      typeof normalized.headingLineHeight !== "number" ||
+      Number.isNaN(normalized.headingLineHeight)
+    ) {
+      normalized.headingLineHeight = TYPO_DEFAULTS.headingLineHeight;
+    }
+    if (
+      typeof normalized.headingGap !== "number" ||
+      Number.isNaN(normalized.headingGap)
+    ) {
+      normalized.headingGap = TYPO_DEFAULTS.headingGap;
+    }
+    return normalized;
+  }
+
+  function normalizeColorValue(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+
+  function resolveTypographyColorsForTheme(settings) {
+    const resolved = Object.assign({}, settings);
+    const isDarkTheme = currentTheme === "dark";
+    const colorKeys = [
+      "textColor",
+      "headingColor",
+      "linkColor",
+      "blockquoteBorderColor",
+      "blockquoteTextColor",
+    ];
+    if (isDarkTheme) {
+      colorKeys.forEach((key) => {
+        const current = normalizeColorValue(resolved[key]);
+        if (TYPO_LIGHT_COLOR_ALIASES[key].has(current)) {
+          resolved[key] = TYPO_DARK_COLOR_DEFAULTS[key];
+        }
+      });
+      return resolved;
+    }
+    colorKeys.forEach((key) => {
+      const current = normalizeColorValue(resolved[key]);
+      const darkDefault = normalizeColorValue(TYPO_DARK_COLOR_DEFAULTS[key]);
+      if (current === darkDefault) {
+        resolved[key] = TYPO_LIGHT_COLOR_DEFAULTS[key];
+      }
+    });
+    return resolved;
+  }
 
   let typographyOpen = false;
 
@@ -2122,11 +2403,12 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
       fontSize: parseFloat(document.getElementById("typo-size").value),
       lineHeight: parseFloat(document.getElementById("typo-line-height").value),
       headingWeight: parseInt(document.getElementById("typo-heading-weight").value),
+      headingLineHeight: parseFloat(document.getElementById("typo-heading-line-height").value),
       headingLetterSpacing: parseFloat(document.getElementById("typo-heading-spacing").value),
       headingScale: parseFloat(document.getElementById("typo-heading-scale").value),
       contentWidth: parseInt(document.getElementById("typo-content-width").value),
       paragraphSpacing: parseFloat(document.getElementById("typo-paragraph").value),
-      headingMarginTop: parseFloat(document.getElementById("typo-heading-gap").value),
+      headingGap: parseFloat(document.getElementById("typo-heading-gap").value),
       listIndent: parseFloat(document.getElementById("typo-list-indent").value),
       codeFontSize: parseFloat(document.getElementById("typo-code-size").value),
       codeBlockRadius: parseInt(document.getElementById("typo-code-radius").value),
@@ -2140,37 +2422,58 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
 
   function applyTypography(s) {
     const root = document.documentElement;
-    root.style.setProperty("--prose-font-family", FONT_STACKS[s.fontFamily] || FONT_STACKS.system);
-    root.style.setProperty("--prose-font-size", s.fontSize + "px");
-    root.style.setProperty("--prose-line-height", s.lineHeight);
-    root.style.setProperty("--prose-color", s.textColor);
-    root.style.setProperty("--prose-heading-weight", s.headingWeight);
-    root.style.setProperty("--prose-heading-letter-spacing", s.headingLetterSpacing + "em");
-    root.style.setProperty("--prose-heading-scale", s.headingScale);
-    root.style.setProperty("--prose-heading-margin-top", s.headingMarginTop + "em");
-    root.style.setProperty("--prose-heading-color", s.headingColor);
-    root.style.setProperty("--prose-paragraph-spacing", s.paragraphSpacing + "em");
-    root.style.setProperty("--prose-list-indent", s.listIndent + "em");
+    const themeAwareSettings = resolveTypographyColorsForTheme(s);
+    const archetype = TYPO_ARCHETYPES[s.fontFamily] || TYPO_ARCHETYPES.engineer;
+    const h1Weight = themeAwareSettings.headingWeight;
+    const h2Weight = Math.max(300, h1Weight - 200);
+    const h3Weight = Math.max(300, h1Weight - 300);
+    const headingScale = themeAwareSettings.headingScale;
+    root.style.setProperty("--prose-font-family", archetype.body);
+    root.style.setProperty("--prose-heading-font-family", archetype.heading);
+    root.style.setProperty("--prose-body-weight", "400");
+    root.style.setProperty("--prose-font-size", themeAwareSettings.fontSize + "px");
+    root.style.setProperty("--prose-line-height", themeAwareSettings.lineHeight);
+    root.style.setProperty("--prose-color", themeAwareSettings.textColor);
+    root.style.setProperty("--prose-heading-weight", themeAwareSettings.headingWeight);
+    root.style.setProperty("--prose-h1-weight", h1Weight);
+    root.style.setProperty("--prose-h2-weight", h2Weight);
+    root.style.setProperty("--prose-h3-weight", h3Weight);
+    root.style.setProperty("--prose-h4-weight", h3Weight);
+    root.style.setProperty("--prose-h1-size", (TYPO_HEADING_BASE_SIZES.h1 * headingScale) + "px");
+    root.style.setProperty("--prose-h2-size", (TYPO_HEADING_BASE_SIZES.h2 * headingScale) + "px");
+    root.style.setProperty("--prose-h3-size", (TYPO_HEADING_BASE_SIZES.h3 * headingScale) + "px");
+    root.style.setProperty("--prose-h4-size", (TYPO_HEADING_BASE_SIZES.h4 * headingScale) + "px");
+    root.style.setProperty("--prose-heading-line-height", themeAwareSettings.headingLineHeight);
+    root.style.setProperty("--prose-heading-letter-spacing", themeAwareSettings.headingLetterSpacing + "em");
+    root.style.setProperty("--prose-heading-scale", themeAwareSettings.headingScale);
+    root.style.setProperty("--prose-heading-margin-bottom", themeAwareSettings.headingGap + "em");
+    root.style.setProperty("--prose-heading-color", themeAwareSettings.headingColor);
+    root.style.setProperty("--prose-paragraph-spacing", themeAwareSettings.paragraphSpacing + "em");
+    root.style.setProperty("--prose-list-indent", themeAwareSettings.listIndent + "em");
     root.style.setProperty("--prose-list-item-spacing", "0.35em");
-    root.style.setProperty("--prose-code-font-size", s.codeFontSize + "em");
-    root.style.setProperty("--prose-code-block-radius", s.codeBlockRadius + "px");
-    root.style.setProperty("--prose-link-color", s.linkColor);
-    root.style.setProperty("--prose-link-underline-color", s.linkColor + "4D");
-    root.style.setProperty("--prose-blockquote-border-color", s.blockquoteBorderColor);
-    root.style.setProperty("--prose-blockquote-text-color", s.blockquoteTextColor);
-    root.style.setProperty("--prose-content-width", s.contentWidth + "px");
+    root.style.setProperty("--prose-code-font-size", themeAwareSettings.codeFontSize + "em");
+    root.style.setProperty("--prose-code-block-radius", themeAwareSettings.codeBlockRadius + "px");
+    root.style.setProperty("--prose-link-color", themeAwareSettings.linkColor);
+    root.style.setProperty("--prose-link-underline-color", themeAwareSettings.linkColor + "4D");
+    root.style.setProperty("--prose-blockquote-border-color", themeAwareSettings.blockquoteBorderColor);
+    root.style.setProperty("--prose-blockquote-text-color", themeAwareSettings.blockquoteTextColor);
+    root.style.setProperty("--prose-content-width", themeAwareSettings.contentWidth + "px");
   }
 
   function populateTypoInputs(s) {
-    document.getElementById("typo-font").value = s.fontFamily;
+    const safeFontFamily = TYPO_ARCHETYPES[s.fontFamily]
+      ? s.fontFamily
+      : TYPO_DEFAULTS.fontFamily;
+    document.getElementById("typo-font").value = safeFontFamily;
     document.getElementById("typo-size").value = s.fontSize;
     document.getElementById("typo-line-height").value = s.lineHeight;
     document.getElementById("typo-heading-weight").value = s.headingWeight;
+    document.getElementById("typo-heading-line-height").value = s.headingLineHeight;
     document.getElementById("typo-heading-spacing").value = s.headingLetterSpacing;
     document.getElementById("typo-heading-scale").value = s.headingScale;
     document.getElementById("typo-content-width").value = s.contentWidth;
     document.getElementById("typo-paragraph").value = s.paragraphSpacing;
-    document.getElementById("typo-heading-gap").value = s.headingMarginTop;
+    document.getElementById("typo-heading-gap").value = s.headingGap;
     document.getElementById("typo-list-indent").value = s.listIndent;
     document.getElementById("typo-code-size").value = s.codeFontSize;
     document.getElementById("typo-code-radius").value = s.codeBlockRadius;
@@ -2189,6 +2492,7 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
     d("typo-size", v("typo-size") + "px");
     d("typo-line-height", parseFloat(v("typo-line-height")).toFixed(2));
     d("typo-heading-weight", v("typo-heading-weight"));
+    d("typo-heading-line-height", parseFloat(v("typo-heading-line-height")).toFixed(2));
     d("typo-heading-spacing", parseFloat(v("typo-heading-spacing")).toFixed(3));
     d("typo-heading-scale", parseFloat(v("typo-heading-scale")).toFixed(2) + "\u00d7");
     d("typo-content-width", v("typo-content-width") + "px");
@@ -2226,20 +2530,20 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
   async function loadTypoSettings() {
     if (!authSession) {
       persistedUserSettings = {};
-      return Object.assign({}, TYPO_DEFAULTS);
+      return normalizeTypoSettings();
     }
     try {
       const res = await apiFetch('/api/settings');
       if (!res.ok) {
         persistedUserSettings = {};
-        return Object.assign({}, TYPO_DEFAULTS);
+        return normalizeTypoSettings();
       }
       const data = await res.json();
       persistedUserSettings = data.settings || {};
-      return Object.assign({}, TYPO_DEFAULTS, persistedUserSettings);
+      return normalizeTypoSettings(persistedUserSettings);
     } catch (e) {
       persistedUserSettings = {};
-      return Object.assign({}, TYPO_DEFAULTS);
+      return normalizeTypoSettings();
     }
   }
 
@@ -2251,8 +2555,12 @@ const DOC_HIGHLIGHT_BLOCK_SELECTOR =
 
   async function initTypography() {
     const settings = await loadTypoSettings();
-    applyTypography(settings);
-    populateTypoInputs(settings);
+    const theme = resolvePreferredTheme(settings);
+    applyTheme(theme);
+    writeLocalThemePreference(theme);
+    const themeAwareSettings = resolveTypographyColorsForTheme(settings);
+    applyTypography(themeAwareSettings);
+    populateTypoInputs(themeAwareSettings);
   }
 
 Object.assign(window, {
@@ -2281,5 +2589,6 @@ Object.assign(window, {
   signOut,
   startRename,
   toggleSidebar,
+  toggleTheme,
   toggleTypography,
 });

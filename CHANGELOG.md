@@ -402,3 +402,18 @@
 - Update `docs/Developer/Architecture.md` to document mode-system invariants and the runtime dependency on `docs/User/Modes.md` for `help` responses.
 - Update `docs/Developer/Get-Started.md` docs map and quality-gate command list to include mode-development guidance and explicit e2e policy/matrix checks.
 - Update `docs/Developer/CLI.md` and `docs/Developer/E2E-Policy.md` to reflect full mode/alias coverage expectations used in day-to-day maintenance.
+
+## v0.7.38 on 2nd of March, 2026
+
+- Replace the `Confab` logo slot in `confab/static/gui.html` with a dedicated theme toggle icon button (`#btnTheme`) in the sidebar header.
+- Add full light/dark theme token support in `frontend/src/styles.css` via `html[data-theme='dark']` CSS variables and wire key surfaces (sidebar, auth gate, composer, attachments, and mode chip) to theme-aware variables.
+- Add theme state management in `frontend/src/main.ts` with `toggleTheme()`, root `data-theme` application, local preference fallback, and persisted user-setting synchronization through `/api/settings`.
+- Keep generated frontend bundles in sync by rebuilding `confab/static/app/gui.css` and `confab/static/app/gui.js` after dark mode implementation.
+
+## v0.7.39 on 2nd of March, 2026
+
+- Fix dark-mode document readability in `frontend/src/main.ts` by applying theme-aware typography color resolution when initializing and toggling themes.
+- Standardize UI monospace rendering in `frontend/src/styles.css` to a single stack (`IBM Plex Mono`, `monospace`) for settings values and `/doc` diff/context surfaces.
+- Add `IBM Plex Mono` to loaded typography families in `confab/static/typography.css` so monospace rendering stays consistent across platforms.
+- Update developer docs in `docs/Developer/API-Reference.md`, `docs/Developer/Mode-Development.md`, `docs/Developer/Architecture.md`, and `docs/Developer/Get-Started.md` for explicit mode routing, mode-lock contracts, typography ownership, and `make dev` startup guidance.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after typography and UI font updates.

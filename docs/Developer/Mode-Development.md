@@ -12,12 +12,14 @@ A mode change is not complete unless all routing surfaces stay in sync.
 
 - Parse prefixes in `confab/domain/modes.py` via `parse_mode()`.
 - Route mode behavior in `confab/server.py` in `api_create_opinion()`.
+- Keep explicit request-body mode override in sync (`PromptRequest.mode` in `confab/api/contracts.py`).
 - Persist mode on writes (`save_chat` / `save_opinion`) so history and continuation work.
 
 ### Frontend
 
 - Parse prefixes in `frontend/src/main.ts` via `detectMode()`.
 - Keep composer mode lock list in sync in `MODE_LOCK_TOKENS`.
+- Send resolved mode explicitly in `POST /api/opinions` payload (`mode`) when mode lock is active.
 - Add thinking label in `thinkingTexts` if user-visible.
 
 ### Tests and E2E Policy
@@ -26,6 +28,7 @@ A mode change is not complete unless all routing surfaces stay in sync.
 - Browser mock parity: `e2e/support/mockApi.ts`.
 - Matrix coverage: `e2e/core-paths.ts` (`MODE_MATRIX_CASES`).
 - Required-mode enforcement: `e2e/check-core-paths.mjs`.
+- Include explicit-mode-route regression coverage (mode-lock + request `mode`).
 
 ## Help Mode Contract (`/help`, `/?`)
 
@@ -34,8 +37,8 @@ Current help mode behavior:
 - Prefixes `/help` and `/?` both map to mode `help`.
 - Backend returns `docs/User/Modes.md` content directly.
 - Help mode does not call any LLM provider.
-- Help turns are persisted like normal chat turns (`mode='help'`).
-- Existing help conversations remain mode-locked on follow-ups.
+- Help turns are not persisted and do not create a history row.
+- Follow-up mode resolution should return to the prior conversation mode (or default chat if none).
 
 Code references:
 
@@ -49,12 +52,14 @@ For any mode addition or change, update all items below in one PR.
 
 1. Backend parser (`confab/domain/modes.py`).
 2. API routing and persistence (`confab/server.py`).
-3. Frontend detection and mode lock (`frontend/src/main.ts`).
-4. API reference (`docs/Developer/API-Reference.md`).
-5. User reference (`docs/User/Modes.md`) if user-visible behavior changed.
-6. Unit tests (`tests/test_api_server.py`).
-7. Playwright mock and matrix (`e2e/support/mockApi.ts`, `e2e/core-paths.ts`).
-8. E2E policy enforcement (`e2e/check-core-paths.mjs`) if required modes changed.
+3. API contracts (`confab/api/contracts.py`) for request/response surface changes.
+4. Frontend detection and mode lock (`frontend/src/main.ts`).
+5. Frontend explicit mode payload (`mode`) for lock-safe routing.
+6. API reference (`docs/Developer/API-Reference.md`).
+7. User reference (`docs/User/Modes.md`) if user-visible behavior changed.
+8. Unit tests (`tests/test_api_server.py`).
+9. Playwright mock and matrix (`e2e/support/mockApi.ts`, `e2e/core-paths.ts`).
+10. E2E policy enforcement (`e2e/check-core-paths.mjs`) if required modes changed.
 
 ## Validation Commands
 

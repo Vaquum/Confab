@@ -44,3 +44,24 @@ test('supports document creation, editing, saving, and proposal acceptance', asy
   await page.locator('.btn-accept').first().click();
   await expect(page.locator('#docContent')).toContainText('Initial draft improved.');
 });
+
+test('opens doc mode when using locked /doc token', async ({ page }) => {
+  await installSupabaseMock(page, { authenticated: true, email: 'qa@example.com' });
+  const api = await installMockApi(page);
+
+  await page.goto('/');
+
+  await page.locator('#input').type('/doc');
+  await page.keyboard.press('Space');
+  await page.locator('#input').type('Create a locked doc');
+  await page.keyboard.press('Enter');
+
+  await expect(page.locator('#docPane')).toHaveClass(/open/);
+  await expect(page.locator('#docContent')).toContainText('Test Document');
+
+  const docRequest = api.requests.find(
+    (entry) => entry.method === 'POST' && entry.pathname === '/api/opinions',
+  );
+  expect(docRequest).toBeTruthy();
+  expect(docRequest?.body).toMatchObject({ mode: 'doc' });
+});
