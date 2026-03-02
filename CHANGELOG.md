@@ -450,3 +450,8 @@
 - Update Render Blueprint `render.yaml` to use locked `uv` dependency sync (`uv.lock`) during build so cloud delivery matches the repository Python toolchain model.
 - Update Render start command to run `uvicorn` from the blueprint-created `.venv` environment for consistent runtime resolution.
 - Update Render deployment section in `docs/Developer/Get-Started.md` to mirror the new build and start commands.
+
+## v0.7.45 on 2nd of March, 2026
+
+- Fix CI bootstrap mismatch in `.github/workflows/pr_checks_quality.yml`, `.github/workflows/pr_checks_tests.yml`, and `.github/workflows/pr_checks_playwright.yml` by aligning `pnpm/action-setup` version with the repository `packageManager` pin (`pnpm@10.6.1`).
+- Restore PR gate compatibility by removing pnpm version ambiguity that caused `ERR_PNPM_BAD_PM_VERSION` failures before any test steps executed.
