@@ -357,6 +357,7 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
 
   // --- Init ---
   renderAllowedDomainBadge();
+  setComposerCentered(true);
   initDocPlusWizard();
   initAuth();
 
@@ -394,9 +395,11 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
     setAuthenticatedUi(!!authSession);
 
     if (authSession) {
+    setComposerCentered(true);
       await initTypography();
       await loadHistory();
     } else {
+    setComposerCentered(true);
       renderHistory([]);
     }
 
@@ -406,6 +409,7 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
 
       if (session) {
         setAuthStatus('');
+      setComposerCentered(true);
         await initTypography();
         await loadHistory();
       } else {
@@ -415,7 +419,7 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
         currentDocument = null;
         document.getElementById('messageContainer').innerHTML = '';
         document.getElementById('messages').style.display = 'none';
-        document.getElementById('welcome').style.display = 'flex';
+      setComposerCentered(true);
         renderHistory([]);
       }
     });
@@ -506,6 +510,12 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
   function toggleSidebar() {
     sidebarCollapsed = !sidebarCollapsed;
     document.querySelector('.sidebar').classList.toggle('collapsed', sidebarCollapsed);
+  }
+
+  function setComposerCentered(centered) {
+    const main = document.getElementById('mainArea');
+    if (!main) return;
+    main.classList.toggle('composer-centered', centered);
   }
 
   // --- Mode detection ---
@@ -758,6 +768,7 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
       const data = await res.json();
 
       currentConversationId = conversationId;
+      setComposerCentered(false);
       // Track last message's mode so follow-ups inherit it
       const lastMsg = data.messages[data.messages.length - 1];
       currentMode = lastMsg ? (lastMsg.mode || data.mode) : data.mode;
@@ -998,7 +1009,8 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
   function newChat() {
     currentConversationId = null;
     currentMode = null;
-    document.getElementById("welcome").style.display = "flex";
+  setComposerCentered(true);
+  document.getElementById("welcome").style.display = "none";
     document.getElementById("messages").style.display = "none";
     document.getElementById("messageContainer").innerHTML = "";
     document.getElementById("input").value = "";
@@ -1249,6 +1261,7 @@ const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
     const thinkingText = thinkingTexts[mode] || "Thinking...";
 
     loading = true;
+  setComposerCentered(false);
     input.value = "";
     autoResize(input);
     document.getElementById("btnSend").disabled = true;

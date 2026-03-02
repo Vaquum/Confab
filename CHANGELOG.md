@@ -263,3 +263,23 @@
 - Fix CI frontend typechecking for `vite.config.ts` by removing `__dirname` usage and resolving paths from `import.meta.url`.
 - Add Node ambient typings to frontend tooling by setting `types: ['node']` in `tsconfig.frontend.json`.
 - Add `@types/node` as a dev dependency in `package.json` and `package-lock.json` so GitHub Actions frontend checks match local behavior.
+
+## v0.7.18 on 1st of March, 2026
+
+- Update new-chat layout to start with a centered composer in `frontend/src/styles.css` and `frontend/src/main.ts`, then smoothly transition the composer to its bottom-docked position after the first send.
+- Remove default welcome copy visibility during new-chat state so the centered view contains only the input composer.
+- Remove the model/mode helper line under the input by deleting the `models-tag` block from `confab/static/gui.html`.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after the composer layout transition update.
+
+## v0.7.19 on 1st of March, 2026
+
+- Refine composer border styling in `frontend/src/styles.css` so focused and unfocused states stay in the same light-grey family with only a subtle darkening.
+- Add always-on ultra-light composer shadow and tune intensity by state, keeping the bottom-docked composer shadow even more subtle than the centered state.
+- Move the send button inside the composer container, reduce its size, and adjust textarea right padding so the inline button sits cleanly without overlapping text.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after the composer visual polish update.
+
+## v0.7.20 on 1st of March, 2026
+
+- Fine-tune composer button sizing in `frontend/src/styles.css` by reducing the inline send button dimensions and icon scale slightly for cleaner visual balance.
+- Rebalance single-line textarea metrics in `frontend/src/styles.css` by adjusting line-height and padding so the text cursor sits vertically centered in the composer.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after the composer micro-alignment update.
