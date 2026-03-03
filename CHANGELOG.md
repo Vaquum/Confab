@@ -490,3 +490,7 @@
 - Fix `/doc` preview/edit synchronization in `frontend/src/main.ts` so switching back to preview always re-renders from the current document source instead of stale preview DOM content.
 - Prevent unaccepted suggestion text from appearing as already applied in preview by making preview mode deterministic even when no new edit is accepted.
 - Add a doc-mode regression test in `e2e/doc.spec.ts` to verify unaccepted proposal content cannot persist across preview/edit toggles.
+
+## v0.7.52 on 3rd of March, 2026
+
+- Refresh `uv.lock` to match `pyproject.toml` metadata so `uv sync --locked` succeeds in CI quality, test, and Playwright workflows.
