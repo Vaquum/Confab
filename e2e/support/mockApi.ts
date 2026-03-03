@@ -355,6 +355,26 @@ export async function installMockApi(
         const currentDocument = latestDocument(conversation);
         const wantsEdits = /edit|revise|improve|change|propose/i.test(cleanPrompt);
         if (wantsEdits) {
+          const wantsEndInsert = /end|bottom|append/i.test(cleanPrompt);
+          const edits = wantsEndInsert
+            ? [
+                {
+                  context_before: 'Initial draft sentence in prior paragraph.',
+                  old: '',
+                  new: '\n\n* * *\n\n**Try this:** Keep one ending thought that points to the next concrete action.',
+                  context_after: '',
+                  description: 'Add decorative separator and call-to-action at end',
+                },
+              ]
+            : [
+                {
+                  context_before: '# Test Document\n\n',
+                  old: 'Initial draft.',
+                  new: 'Initial draft improved.',
+                  context_after: '',
+                  description: 'Improve draft sentence',
+                },
+              ];
           appendMessage(state, conversation, {
             mode,
             prompt,
@@ -365,15 +385,7 @@ export async function installMockApi(
             mode,
             conversation_id: conversation.conversation_id,
             response: 'Proposed targeted edits.',
-            edits: [
-              {
-                context_before: '# Test Document\n\n',
-                old: 'Initial draft.',
-                new: 'Initial draft improved.',
-                context_after: '',
-                description: 'Improve draft sentence',
-              },
-            ],
+            edits,
           });
           return;
         }
