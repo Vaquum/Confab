@@ -15,7 +15,8 @@ This guide covers full local setup, auth wiring, and deployment preparation.
 ## Prerequisites
 
 - Python `3.10+`
-- Node.js `20+` and `npm`
+- `uv`
+- Node.js `20+` and `pnpm`
 - A local virtual environment named `venv`
 - A Supabase project
 - A Resend account with verified sending domain/subdomain
@@ -23,12 +24,12 @@ This guide covers full local setup, auth wiring, and deployment preparation.
 
 ## Local Environment
 
-Create `venv` and install dependencies:
+Create `venv` and sync dependencies:
 
 ```bash
 python3.10 -m venv venv
 source venv/bin/activate
-pip install -e .
+pnpm run py:sync
 ```
 
 Create `.env` in project root:
@@ -53,6 +54,8 @@ Notes:
 - `SUPABASE_URL` + `SUPABASE_ANON_KEY` are injected into the frontend.
 - `SUPABASE_SERVICE_ROLE_KEY` is used for backend-triggered magic-link requests.
 - `DOMAIN` controls login domain restriction in backend and UI.
+- `uv.lock` is the Python dependency lock source for local and CI.
+- Python package scripts (`py:*`) pin `uv` execution to the `venv` directory.
 - Optional Gemini tuning env vars:
   - `GEMINI_MAX_OUTPUT_TOKENS` (default `2048`)
   - `GEMINI_THINKING_BUDGET` (default `512`)
@@ -127,14 +130,14 @@ Use these commands after changing frontend source:
 
 ```bash
 source venv/bin/activate
-npm install
-npm run check:frontend
+pnpm install --frozen-lockfile
+pnpm run check:frontend
 ```
 
 Notes:
 
-- `npm run typecheck:frontend` runs TypeScript checks.
-- `npm run build:frontend` emits `gui.js` and `gui.css` into `confab/static/app/`.
+- `pnpm run typecheck:frontend` runs TypeScript checks.
+- `pnpm run build:frontend` emits `gui.js` and `gui.css` into `confab/static/app/`.
 - `confab/static/gui.html` is now a thin shell that loads `/app/gui.js` and `/app/gui.css`.
 - `confab/static/app/` is generated output; edit source in `frontend/src/` instead.
 
@@ -144,9 +147,9 @@ Install Playwright dependencies and run the browser suite:
 
 ```bash
 source venv/bin/activate
-npm install
-npx playwright install chromium
-npm run e2e
+pnpm install --frozen-lockfile
+pnpm exec playwright install chromium
+pnpm run e2e
 ```
 
 Notes:
@@ -159,22 +162,21 @@ Run policy and mode-smoke checks explicitly:
 
 ```bash
 source venv/bin/activate
-npm run e2e:policy
-npm run e2e:matrix
+pnpm run e2e:policy
+pnpm run e2e:matrix
 ```
 
 ## Run Full Quality Gates
 
 ```bash
 source venv/bin/activate
-python -m compileall confab tests
-ruff check confab tests
-pyright confab/config confab/providers confab/services confab/core.py
-npm run check:frontend
-python tests/run.py
-npm run e2e:policy
-npm run e2e:matrix
-npm run e2e
+pnpm run py:sync
+pnpm run py:quality
+pnpm run check:frontend
+pnpm run py:tests
+pnpm run e2e:policy
+pnpm run e2e:matrix
+pnpm run e2e
 ```
 
 CI runs these checks in workflows:
@@ -182,6 +184,8 @@ CI runs these checks in workflows:
 - `.github/workflows/pr_checks_quality.yml`
 - `.github/workflows/pr_checks_tests.yml`
 - `.github/workflows/pr_checks_playwright.yml`
+
+Node-oriented CI tasks are orchestrated with Turborepo (`pnpm turbo run ...`), while Python checks/tests run via `uv`-backed package scripts.
 
 ## Authentication Behavior
 
@@ -200,8 +204,8 @@ Blueprint defaults:
 - Region: `frankfurt`
 - Auto deploy: enabled
 - Runtime: Python `3.10.14`
-- Build command: `pip install -e . && python -m compileall confab`
-- Start command: `uvicorn confab.server:app --host 0.0.0.0 --port $PORT`
+- Build command: `pip install 'uv==0.10.7' && UV_PROJECT_ENVIRONMENT=.venv uv sync --locked --no-dev && .venv/bin/python -m compileall confab`
+- Start command: `.venv/bin/uvicorn confab.server:app --host 0.0.0.0 --port $PORT`
 
 Deploy with blueprint:
 

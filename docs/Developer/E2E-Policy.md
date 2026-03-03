@@ -76,15 +76,15 @@ Requirements:
 
 Automated enforcement:
 
-- `npm run e2e:policy`
+- `pnpm run e2e:policy`
 
 ## CI Enforcement
 
 Playwright CI must run in this order:
 
-1. `npm run e2e:policy`
-2. `npm run e2e:matrix`
-3. `npm run e2e`
+1. `pnpm run e2e:policy`
+2. `pnpm run e2e:matrix`
+3. `pnpm run e2e`
 
 This ensures manifest integrity first, smoke guardrails second, full journeys third.
 
@@ -97,8 +97,8 @@ For any user-visible feature PR:
 3. Add or update journey spec for continuation behavior.
 4. Update mocks to reflect backend contract changes.
 5. Run locally:
-   - `npm run e2e:policy`
-   - `npm run e2e:matrix`
-   - `npm run e2e`
+   - `pnpm run e2e:policy`
+   - `pnpm run e2e:matrix`
+   - `pnpm run e2e`
 
 PR review should block merge if any checklist item is skipped.

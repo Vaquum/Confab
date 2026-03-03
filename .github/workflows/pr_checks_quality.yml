@@ -21,25 +21,26 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.1
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-
-      - name: Install Python dependencies
-        run: |
-          pip install -e .
-          pip install pyright ruff
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install Node dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
-      - name: Run Python compile, lint, and type checks
-        run: |
-          python -m compileall confab tests
-          ruff check confab tests
-          pyright confab/config confab/providers confab/services confab/core.py
+      - name: Sync Python dependencies
+        run: pnpm run py:sync
 
-      - name: Run frontend typecheck and build
-        run: npm run check:frontend
+      - name: Run Python quality and frontend build gates
+        run: pnpm turbo run py:quality check:frontend

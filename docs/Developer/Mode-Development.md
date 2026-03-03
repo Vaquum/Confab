@@ -67,10 +67,11 @@ Run from project root:
 
 ```bash
 source venv/bin/activate
-python tests/run.py
-npm run check:frontend
-npm run e2e:policy
-npm run e2e:matrix
+pnpm run py:sync
+pnpm run py:tests
+pnpm run check:frontend
+pnpm run e2e:policy
+pnpm run e2e:matrix
 ```
 
 ## Common Failure Pattern
