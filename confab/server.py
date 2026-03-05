@@ -517,9 +517,12 @@ def api_create_opinion(req: PromptRequest, user=Depends(get_current_user)):
 
 @app.post('/api/review/pr', response_model=PrReviewResponse)
 def api_review_pr(req: PrReviewRequest, _=Depends(_require_api_key)):
-    synthesis, _responses, _errors, conversation_id = run_pr_review(
-        req.url, keys, user_id='api',
-    )
+    try:
+        synthesis, _responses, _errors, conversation_id = run_pr_review(
+            req.url, keys, user_id='api',
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
     return {
         'synthesis': synthesis,
         'conversation_id': conversation_id,
