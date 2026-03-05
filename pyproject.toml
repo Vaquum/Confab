@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "confab"
-version = "0.7.46"
+version = "0.7.52"
 description = "A multi-chat high-productivity workground."
 readme = "README.md"
 authors = [

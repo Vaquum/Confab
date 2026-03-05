@@ -1705,6 +1705,10 @@
     margin-top: auto;
   }
 
+  .doc-plus-actions.no-back {
+    justify-content: flex-end;
+  }
+
   .doc-plus-actions .btn-reset,
   .doc-plus-next {
     width: 140px;
@@ -1717,4 +1721,25 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .doc-plus-next {
+    border: none;
+    background: var(--composer-send-bg);
+    color: var(--bubble-user-text);
+    cursor: pointer;
+    position: static;
+    right: auto;
+    bottom: auto;
+    z-index: auto;
+    transition: background 0.15s;
+  }
+
+  .doc-plus-next:hover {
+    background: var(--composer-send-hover);
+  }
+
+  .doc-plus-next:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }

@@ -11,6 +11,26 @@ async function finishDocPlusWizard(page: Page): Promise<void> {
   await page.locator('#btnDocPlusNext').click();
 }
 
+test('doc+ wizard shows next on first step and back from second step', async ({
+  page,
+}) => {
+  await installSupabaseMock(page, { authenticated: true, email: 'qa@example.com' });
+  await installMockApi(page);
+
+  await page.goto('/');
+  await page.locator('#input').fill('/doc+ Draft launch memo');
+  await page.keyboard.press('Enter');
+
+  const back = page.locator('#btnDocPlusBack');
+  const next = page.locator('#btnDocPlusNext');
+  await expect(next).toBeVisible();
+  await expect(back).toBeHidden();
+
+  await next.click();
+  await expect(page.locator('#docPlusStepCount')).toHaveText('Step 2 of 6');
+  await expect(back).toBeVisible();
+});
+
 test('doc+ enter path opens wizard, submits profile context, and follows up without reopening', async ({
   page,
 }) => {

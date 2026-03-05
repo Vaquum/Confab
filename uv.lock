@@ -256,7 +256,7 @@ wheels = [
 
 [[package]]
 name = "confab"
-version = "0.7.46"
+version = "0.7.52"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },

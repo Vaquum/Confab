@@ -989,7 +989,14 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
       });
     });
 
-    back.disabled = docPlusWizardStepIndex === 0;
+    const showBack = docPlusWizardStepIndex > 0;
+    back.hidden = false;
+    back.style.display = showBack ? 'inline-flex' : 'none';
+    back.disabled = !showBack;
+    const actions = back.closest('.doc-plus-actions');
+    if (actions) {
+      actions.classList.toggle('no-back', !showBack);
+    }
     next.textContent = docPlusWizardStepIndex === DOC_PLUS_LEVELS.length - 1 ? "Finish" : "Next";
   }
 
@@ -1579,7 +1586,7 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
 
   function applyEdit(editId) {
     const edit = _editStore[editId];
-    if (!edit || !currentDocument) return;
+    if (!edit || currentDocument == null) return;
 
     const card = document.getElementById('edit_' + editId);
     const status = document.getElementById('editStatus_' + editId);
@@ -1615,12 +1622,13 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
       if (pos === -1) {
         markConflict(card, status);
         return;
+      } else {
+        currentDocument = (
+          currentDocument.slice(0, pos)
+          + replaceStr
+          + currentDocument.slice(pos + searchStr.length)
+        );
       }
-      currentDocument = (
-        currentDocument.slice(0, pos)
-        + replaceStr
-        + currentDocument.slice(pos + searchStr.length)
-      );
     }
 
     document.getElementById('docContent').innerHTML = md(currentDocument);
@@ -1777,14 +1785,16 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     const body = document.getElementById('docBody');
 
     if (docEditMode) {
-      document.getElementById('docEditor').value = currentDocument || '';
+      document.getElementById('docEditor').value = currentDocument ?? '';
       body.classList.add('editing');
     } else {
+      const editorValue = document.getElementById('docEditor').value;
       if (docDirty) {
-        currentDocument = document.getElementById('docEditor').value;
-        document.getElementById('docContent').innerHTML = md(currentDocument);
+        currentDocument = editorValue;
         saveDocumentEdit();
       }
+      const previewSource = currentDocument ?? editorValue ?? '';
+      document.getElementById('docContent').innerHTML = md(previewSource);
       body.classList.remove('editing');
     }
 
@@ -1803,7 +1813,7 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
   }
 
   async function saveDocumentEdit() {
-    if (!currentConversationId || !currentDocument) return;
+    if (!currentConversationId || currentDocument == null) return;
     try {
       await apiFetch(`/api/conversations/${currentConversationId}/document`, {
         method: 'PUT',
@@ -2166,6 +2176,23 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
       inputWrap.classList.remove('multiline');
     }
     el.style.height = "auto";
+    const isEmpty = el.value.trim().length === 0;
+    if (isEmpty) {
+      const computedStyle = window.getComputedStyle(el);
+      const singleLineHeight = Math.ceil(
+        (parseFloat(computedStyle.lineHeight) || 20)
+        + (parseFloat(computedStyle.paddingTop) || 0)
+        + (parseFloat(computedStyle.paddingBottom) || 0)
+        + (parseFloat(computedStyle.borderTopWidth) || 0)
+        + (parseFloat(computedStyle.borderBottomWidth) || 0),
+      );
+      el.style.height = `${singleLineHeight}px`;
+      el.style.overflowY = "hidden";
+      if (composerModeLock) {
+        renderComposerModeLock();
+      }
+      return;
+    }
     const baseScrollHeight = el.scrollHeight;
     const hasExplicitLineBreak = el.value.includes('\n');
     const isMultiline = hasExplicitLineBreak || (
@@ -2260,7 +2287,7 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     headingScale: 1,
     contentWidth: 720,
     paragraphSpacing: 1.15,
-    headingGap: 0.6,
+    headingGap: 1,
     listIndent: 1.5,
     codeFontSize: 0.875,
     codeBlockRadius: 8,

@@ -461,3 +461,36 @@
 - Remove duplicate policy execution in E2E smoke paths by changing `e2e:matrix` in `package.json` to run matrix tests only and removing the `e2e:policy` Turbo dependency from `turbo.json`.
 - Enforce lockfile fidelity in local/CI Python sync by adding `--locked` to `py:sync` in `package.json`.
 - Pin Render uv bootstrap in `render.yaml` and `docs/Developer/Get-Started.md` to `uv==0.10.7` for reproducible deployment toolchain behavior.
+
+## v0.7.47 on 3rd of March, 2026
+
+- Fix composer resize behavior in `frontend/src/main.ts` so whitespace-only input always resets to the single-line height instead of staying in multiline state.
+- Keep existing multiline expansion behavior unchanged for non-empty prompts while preserving mode-lock padding refresh in resize flow.
+- Regenerate frontend static bundles in `confab/static/app/gui.css` and `confab/static/app/gui.js` after composer empty-state resize fix.
+
+## v0.7.48 on 3rd of March, 2026
+
+- Lower the `Heading gap` slider minimum in `confab/static/gui.html` from `1.0` to `0.5` so users can choose tighter heading spacing.
+- Keep default heading gap at `1em` by updating `TYPO_DEFAULTS.headingGap` in `frontend/src/main.ts` to `1`.
+
+## v0.7.49 on 3rd of March, 2026
+
+- Fix `/doc` edit application at document end in `frontend/src/main.ts` by falling back to true end-of-document insertion for insertion edits when trailing context is missing or mismatched.
+- Add append-safe fallback in `frontend/src/main.ts` for replacement-shaped end edits (`new` starts with `old`) so accepted end additions no longer conflict.
+- Extend doc-mode e2e coverage in `e2e/doc.spec.ts` and `e2e/support/mockApi.ts` with a regression test for append-at-end proposal acceptance when end context is not an exact match.
+
+## v0.7.50 on 3rd of March, 2026
+
+- Fix doc+ wizard footer controls by removing composer-send positioning from `#btnDocPlusNext` and styling `.doc-plus-next` as a modal action button that stays anchored to the right side.
+- Update doc+ wizard step rendering in `frontend/src/main.ts` so `Back` is hidden on step 1 and appears from step 2 onward, while preserving mirrored left/right footer alignment.
+- Add wizard-control regression coverage in `e2e/doc-plus.spec.ts` to assert `Next` is visible on step 1 and `Back` becomes visible on step 2.
+
+## v0.7.51 on 3rd of March, 2026
+
+- Fix `/doc` preview/edit synchronization in `frontend/src/main.ts` so switching back to preview always re-renders from the current document source instead of stale preview DOM content.
+- Prevent unaccepted suggestion text from appearing as already applied in preview by making preview mode deterministic even when no new edit is accepted.
+- Add a doc-mode regression test in `e2e/doc.spec.ts` to verify unaccepted proposal content cannot persist across preview/edit toggles.
+
+## v0.7.52 on 3rd of March, 2026
+
+- Refresh `uv.lock` to match `pyproject.toml` metadata so `uv sync --locked` succeeds in CI quality, test, and Playwright workflows.
