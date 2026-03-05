@@ -25,16 +25,15 @@ If your environment is already configured, use these three examples:
 1) Running the app
 
 ```bash
-source venv/bin/activate
-uvicorn confab.server:app --reload
+make dev
 ```
 
 2) Using the REST API
 
 ```bash
-curl -X POST "http://localhost:8000/api/auth/magic-link" \
+curl -X POST "http://localhost:7777/api/auth/magic-link" \
   -H "Content-Type: application/json" \
-  -d '{"email":"you@<your-domain>","email_redirect_to":"http://localhost:8000"}'
+  -d '{"email":"you@<your-domain>","email_redirect_to":"http://localhost:7777"}'
 ```
 
 3) Using the CLI

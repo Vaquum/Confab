@@ -16,6 +16,8 @@ if __package__:
         DocumentUpdateRequest,
         MagicLinkRequest,
         OkResponse,
+        PrReviewRequest,
+        PrReviewResponse,
         PromptRequest,
         RenameRequest,
         SettingsRequest,
@@ -27,6 +29,7 @@ if __package__:
         run_chat,
         run_doc,
         run_opinions_stream,
+        run_pr_review,
         run_pr_review_stream,
     )
     from .db import init_db
@@ -48,6 +51,8 @@ else:
         DocumentUpdateRequest,
         MagicLinkRequest,
         OkResponse,
+        PrReviewRequest,
+        PrReviewResponse,
         PromptRequest,
         RenameRequest,
         SettingsRequest,
@@ -59,6 +64,7 @@ else:
         run_chat,
         run_doc,
         run_opinions_stream,
+        run_pr_review,
         run_pr_review_stream,
     )
     from confab.db import init_db
@@ -84,6 +90,7 @@ init_db()
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY')
 SUPABASE_AUTH_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or SUPABASE_ANON_KEY
+CONFAB_API_KEY = os.environ.get('CONFAB_API_KEY')
 
 
 def _normalize_domain(value):
@@ -236,6 +243,14 @@ def _fetch_supabase_user(access_token):
 def get_current_user(authorization: str | None = Header(default=None)):
     token = _get_bearer_token(authorization)
     return _fetch_supabase_user(token)
+
+
+def _require_api_key(authorization: str | None = Header(default=None)):
+    if not CONFAB_API_KEY:
+        raise HTTPException(status_code=500, detail='API key is not configured')
+    token = _get_bearer_token(authorization)
+    if token != CONFAB_API_KEY:
+        raise HTTPException(status_code=401, detail='Invalid API key')
 
 
 @app.get('/', response_class=HTMLResponse)
@@ -498,3 +513,14 @@ def api_create_opinion(req: PromptRequest, user=Depends(get_current_user)):
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post('/api/review/pr', response_model=PrReviewResponse)
+def api_review_pr(req: PrReviewRequest, _=Depends(_require_api_key)):
+    synthesis, _responses, _errors, conversation_id = run_pr_review(
+        req.url, keys, user_id='api',
+    )
+    return {
+        'synthesis': synthesis,
+        'conversation_id': conversation_id,
+    }
