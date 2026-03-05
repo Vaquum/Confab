@@ -176,7 +176,7 @@ function appendMessage(
 function latestDocument(conversation: Conversation): string {
   for (let index = conversation.messages.length - 1; index >= 0; index -= 1) {
     const candidate = conversation.messages[index].document;
-    if (candidate) {
+    if (candidate !== undefined) {
       return candidate;
     }
   }
@@ -355,26 +355,48 @@ export async function installMockApi(
         const currentDocument = latestDocument(conversation);
         const wantsEdits = /edit|revise|improve|change|propose/i.test(cleanPrompt);
         if (wantsEdits) {
-          const wantsEndInsert = /end|bottom|append/i.test(cleanPrompt);
-          const edits = wantsEndInsert
+          const wantsEndInsert = /\b(end|bottom|append)\b/i.test(cleanPrompt);
+          const wantsInsertionConflict = /\bconflict insertion\b/i.test(cleanPrompt);
+          const wantsReplacementConflict = /\bconflict replacement\b/i.test(cleanPrompt);
+          const edits = wantsInsertionConflict
             ? [
                 {
                   context_before: 'Initial draft sentence in prior paragraph.',
                   old: '',
-                  new: '\n\n* * *\n\n**Try this:** Keep one ending thought that points to the next concrete action.',
+                  new: '\n\n**Insertion conflict:** This should not be applied without a matching anchor.',
                   context_after: '',
-                  description: 'Add decorative separator and call-to-action at end',
+                  description: 'Demonstrate insertion conflict for missing anchor',
                 },
               ]
-            : [
-                {
-                  context_before: '# Test Document\n\n',
-                  old: 'Initial draft.',
-                  new: 'Initial draft improved.',
-                  context_after: '',
-                  description: 'Improve draft sentence',
-                },
-              ];
+            : wantsReplacementConflict
+              ? [
+                  {
+                    context_before: '# Test Document\n\n',
+                    old: 'Initial draft sentence.',
+                    new: 'Initial draft sentence. **Replacement conflict:** This should not append.',
+                    context_after: '',
+                    description: 'Demonstrate replacement conflict for missing old text',
+                  },
+                ]
+              : wantsEndInsert
+                ? [
+                    {
+                      context_before: '',
+                      old: '',
+                      new: '\n\n* * *\n\n**Try this:** Keep one ending thought that points to the next concrete action.',
+                      context_after: '',
+                      description: 'Add decorative separator and call-to-action at end',
+                    },
+                  ]
+                : [
+                    {
+                      context_before: '# Test Document\n\n',
+                      old: 'Initial draft.',
+                      new: 'Initial draft improved.',
+                      context_after: '',
+                      description: 'Improve draft sentence',
+                    },
+                  ];
           appendMessage(state, conversation, {
             mode,
             prompt,

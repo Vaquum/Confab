@@ -1540,7 +1540,7 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     if (before) {
       const beforePos = documentText.lastIndexOf(before);
       if (beforePos === -1) {
-        return documentText.length;
+        return -1;
       }
       return beforePos + before.length;
     }
@@ -1586,7 +1586,7 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
 
   function applyEdit(editId) {
     const edit = _editStore[editId];
-    if (!edit || !currentDocument) return;
+    if (!edit || currentDocument == null) return;
 
     const card = document.getElementById('edit_' + editId);
     const status = document.getElementById('editStatus_' + editId);
@@ -1620,19 +1620,8 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
         edit.context_after,
       );
       if (pos === -1) {
-        const canAppendFromReplacement = (
-          !edit.context_after
-          && typeof searchStr === 'string'
-          && typeof replaceStr === 'string'
-          && replaceStr.startsWith(searchStr)
-          && replaceStr.length > searchStr.length
-        );
-        if (canAppendFromReplacement) {
-          currentDocument = currentDocument + replaceStr.slice(searchStr.length);
-        } else {
-          markConflict(card, status);
-          return;
-        }
+        markConflict(card, status);
+        return;
       } else {
         currentDocument = (
           currentDocument.slice(0, pos)
@@ -1796,7 +1785,7 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     const body = document.getElementById('docBody');
 
     if (docEditMode) {
-      document.getElementById('docEditor').value = currentDocument || '';
+      document.getElementById('docEditor').value = currentDocument ?? '';
       body.classList.add('editing');
     } else {
       const editorValue = document.getElementById('docEditor').value;
@@ -1804,7 +1793,7 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
         currentDocument = editorValue;
         saveDocumentEdit();
       }
-      const previewSource = currentDocument || editorValue || '';
+      const previewSource = currentDocument ?? editorValue ?? '';
       document.getElementById('docContent').innerHTML = md(previewSource);
       body.classList.remove('editing');
     }
@@ -1824,7 +1813,7 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
   }
 
   async function saveDocumentEdit() {
-    if (!currentConversationId || !currentDocument) return;
+    if (!currentConversationId || currentDocument == null) return;
     try {
       await apiFetch(`/api/conversations/${currentConversationId}/document`, {
         method: 'PUT',
