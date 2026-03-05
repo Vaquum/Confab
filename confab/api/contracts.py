@@ -29,6 +29,15 @@ class MagicLinkRequest(BaseModel):
     email_redirect_to: str | None = None
 
 
+class PrReviewRequest(BaseModel):
+    url: str
+
+
+class PrReviewResponse(BaseModel):
+    synthesis: str
+    conversation_id: str
+
+
 class OkResponse(BaseModel):
     ok: bool
 
