@@ -767,7 +767,7 @@
 
   .input-wrap textarea {
     width: 100%;
-    padding: 11px 46px 11px 46px;
+    padding: 11px 12px 38px 16px;
     border: none;
     border-radius: 12px;
     background: transparent;
@@ -778,17 +778,9 @@
     resize: none;
     outline: none;
     overflow: hidden;
-    height: 44px;
+    height: 70px;
     display: block;
-    transition: height 0.18s ease, padding-bottom 0.18s ease;
-  }
-
-  .input-wrap.multiline textarea {
-    padding-bottom: 38px;
-  }
-
-  .input-wrap.mode-locked textarea {
-    padding-left: var(--mode-lock-input-padding-left, 46px);
+    transition: height 0.18s ease;
   }
 
   .input-wrap textarea::placeholder { color: var(--text-faint); }
