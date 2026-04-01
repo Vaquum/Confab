@@ -2120,8 +2120,6 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
         }
       }
 
-      await loadHistory();
-
     } catch (e) {
       const thinking = document.getElementById("thinkingBlock");
       if (thinking) thinking.remove();
@@ -2142,6 +2140,7 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
       const btnSend = document.getElementById("btnSend");
       btnSend.disabled = false;
       btnSend.innerHTML = SEND_ICON_SVG;
+      await loadHistory();
     }
   }
 
