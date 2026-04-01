@@ -1901,6 +1901,29 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     }
   }
 
+  function addPendingSidebarEntry(promptText, attachmentNames, mode) {
+    const el = document.getElementById("chatList");
+    if (!el) return;
+    const modeLabel = mode === "doc_plus" ? "doc+" : mode;
+    const date = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    let title = promptText;
+    let titleClass = '';
+    if (!promptText && attachmentNames.length) {
+      title = attachmentNames[0];
+      titleClass = ' attachment-name';
+    }
+    const entryHtml = `<div class="chat-item active" id="pendingSidebarEntry">
+      <div class="chat-item-prompt${titleClass}">${esc(title)}</div>
+      <div class="chat-item-meta">
+        <span class="chat-item-mode">${modeLabel}</span>
+        <span>${date}</span>
+      </div>
+    </div>`;
+    const emptyMsg = el.querySelector('.sidebar-empty');
+    if (emptyMsg) emptyMsg.remove();
+    el.insertAdjacentHTML('afterbegin', entryHtml);
+  }
+
   // --- Send ---
   async function send() {
     const input = document.getElementById("input");
@@ -1984,6 +2007,10 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
         </div>`;
     }
     msgs.scrollTop = msgs.scrollHeight;
+
+    if (!requestConversationId && mode !== 'help') {
+      addPendingSidebarEntry(rawPrompt, attachmentNames, mode);
+    }
 
     try {
       const res = await apiFetch("/api/opinions", {
