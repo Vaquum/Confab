@@ -40,6 +40,11 @@ export const CORE_PATHS: CorePath[] = [
     description: 'Every prefix mode can submit and render first response',
     ownerSpec: 'e2e/mode-matrix.spec.ts',
   },
+  {
+    id: 'composer-stop-and-sidebar',
+    description: 'Stop button aborts requests and new chats appear in sidebar immediately',
+    ownerSpec: 'e2e/composer-controls.spec.ts',
+  },
 ];
 
 export type SendMethod = 'enter' | 'button';
