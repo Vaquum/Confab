@@ -369,6 +369,9 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
   let currentConversationId = null;
   let currentMode = null;
   let loading = false;
+  let currentAbortController: AbortController | null = null;
+  const SEND_ICON_SVG = '<svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
+  const STOP_ICON_SVG = '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/></svg>';
   let sidebarCollapsed = false;
   let currentDocument = null;
   let docPaneOpen = false;
@@ -1905,7 +1908,11 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     const attachmentsForSend = pendingAttachments.slice();
     const previousConversationId = currentConversationId;
     const previousMode = currentMode;
-    if ((!rawPrompt && attachmentsForSend.length === 0) || loading || !authSession) return;
+    if (loading) {
+      if (currentAbortController) currentAbortController.abort();
+      return;
+    }
+    if ((!rawPrompt && attachmentsForSend.length === 0) || !authSession) return;
     const prompt = buildPromptWithAttachments(rawPrompt, attachmentsForSend);
 
     // Explicit @prefix wins, otherwise inherit last mode, default to chat
@@ -1938,12 +1945,15 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     const attachmentNames = attachmentsForSend.map((attachment) => attachment.name);
 
     loading = true;
+    currentAbortController = new AbortController();
+    const btnSend = document.getElementById("btnSend");
+    btnSend.disabled = false;
+    btnSend.innerHTML = STOP_ICON_SVG;
     setComposerCentered(false);
     pendingAttachments = [];
     renderAttachmentList();
     input.value = "";
     autoResize(input);
-    document.getElementById("btnSend").disabled = true;
 
     // Show user message
     document.getElementById("welcome").style.display = "none";
@@ -1985,6 +1995,7 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
           doc_plus_context: docPlusContext,
           mode,
         }),
+        signal: currentAbortController?.signal,
       });
 
       const contentType = res.headers.get("content-type") || "";
@@ -2087,13 +2098,23 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     } catch (e) {
       const thinking = document.getElementById("thinkingBlock");
       if (thinking) thinking.remove();
-      container.innerHTML += `
-        <div class="message ai">
-          <div class="message-bubble" style="color:#b91c1c">${esc(e.message)}</div>
-        </div>`;
+      if (e.name === 'AbortError') {
+        container.innerHTML += `
+          <div class="message ai">
+            <div class="message-bubble" style="color:var(--text-faint)">Stopped.</div>
+          </div>`;
+      } else {
+        container.innerHTML += `
+          <div class="message ai">
+            <div class="message-bubble" style="color:#b91c1c">${esc(e.message)}</div>
+          </div>`;
+      }
     } finally {
       loading = false;
-      document.getElementById("btnSend").disabled = false;
+      currentAbortController = null;
+      const btnSend = document.getElementById("btnSend");
+      btnSend.disabled = false;
+      btnSend.innerHTML = SEND_ICON_SVG;
     }
   }
 
