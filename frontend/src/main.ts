@@ -360,7 +360,7 @@ const MODE_LOCK_LEFT_OFFSET_PX = 40;
 const MODE_LOCK_CURSOR_GAP_PX = 7;
 const MIN_INPUT_LEFT_PADDING_PX = 46;
 const COMPOSER_MULTILINE_SCROLL_THRESHOLD_PX = 50;
-const COMPOSER_MULTILINE_PADDING_BOTTOM_PX = 38;
+const COMPOSER_MULTILINE_PADDING_BOTTOM_PX = 6;
 const DOC_HIGHLIGHT_BLOCK_SELECTOR =
   'p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, code, td, th';
 const HISTORY_EMPTY_RETRY_LIMIT = 3;
@@ -2203,7 +2203,7 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     }
 
     el.style.height = "auto";
-    const max = 160;
+    const max = 120;
     const fullScrollHeight = el.scrollHeight;
     const lineHeight = parseFloat(window.getComputedStyle(el).lineHeight) || 20;
     const paddingTop = parseFloat(window.getComputedStyle(el).paddingTop) || 0;
