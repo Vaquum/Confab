@@ -360,7 +360,7 @@ const MODE_LOCK_LEFT_OFFSET_PX = 40;
 const MODE_LOCK_CURSOR_GAP_PX = 7;
 const MIN_INPUT_LEFT_PADDING_PX = 46;
 const COMPOSER_MULTILINE_SCROLL_THRESHOLD_PX = 50;
-const COMPOSER_MULTILINE_PADDING_BOTTOM_PX = 38;
+const COMPOSER_MULTILINE_PADDING_BOTTOM_PX = 6;
 const DOC_HIGHLIGHT_BLOCK_SELECTOR =
   'p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, code, td, th';
 const HISTORY_EMPTY_RETRY_LIMIT = 3;
@@ -369,6 +369,9 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
   let currentConversationId = null;
   let currentMode = null;
   let loading = false;
+  let currentAbortController: AbortController | null = null;
+  const SEND_ICON_SVG = '<svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
+  const STOP_ICON_SVG = '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/></svg>';
   let sidebarCollapsed = false;
   let currentDocument = null;
   let docPaneOpen = false;
@@ -1898,6 +1901,29 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     }
   }
 
+  function addPendingSidebarEntry(promptText, attachmentNames, mode) {
+    const el = document.getElementById("chatList");
+    if (!el) return;
+    const modeLabel = mode === "doc_plus" ? "doc+" : mode;
+    const date = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    let title = promptText;
+    let titleClass = '';
+    if (!promptText && attachmentNames.length) {
+      title = attachmentNames[0];
+      titleClass = ' attachment-name';
+    }
+    const entryHtml = `<div class="chat-item active" id="pendingSidebarEntry">
+      <div class="chat-item-prompt${titleClass}">${esc(title)}</div>
+      <div class="chat-item-meta">
+        <span class="chat-item-mode">${modeLabel}</span>
+        <span>${date}</span>
+      </div>
+    </div>`;
+    const emptyMsg = el.querySelector('.sidebar-empty');
+    if (emptyMsg) emptyMsg.remove();
+    el.insertAdjacentHTML('afterbegin', entryHtml);
+  }
+
   // --- Send ---
   async function send() {
     const input = document.getElementById("input");
@@ -1905,7 +1931,11 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     const attachmentsForSend = pendingAttachments.slice();
     const previousConversationId = currentConversationId;
     const previousMode = currentMode;
-    if ((!rawPrompt && attachmentsForSend.length === 0) || loading || !authSession) return;
+    if (loading) {
+      if (currentAbortController) currentAbortController.abort();
+      return;
+    }
+    if ((!rawPrompt && attachmentsForSend.length === 0) || !authSession) return;
     const prompt = buildPromptWithAttachments(rawPrompt, attachmentsForSend);
 
     // Explicit @prefix wins, otherwise inherit last mode, default to chat
@@ -1938,12 +1968,15 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     const attachmentNames = attachmentsForSend.map((attachment) => attachment.name);
 
     loading = true;
+    currentAbortController = new AbortController();
+    const btnSend = document.getElementById("btnSend");
+    btnSend.disabled = false;
+    btnSend.innerHTML = STOP_ICON_SVG;
     setComposerCentered(false);
     pendingAttachments = [];
     renderAttachmentList();
     input.value = "";
     autoResize(input);
-    document.getElementById("btnSend").disabled = true;
 
     // Show user message
     document.getElementById("welcome").style.display = "none";
@@ -1975,6 +2008,10 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     }
     msgs.scrollTop = msgs.scrollHeight;
 
+    if (!requestConversationId && mode !== 'help') {
+      addPendingSidebarEntry(rawPrompt, attachmentNames, mode);
+    }
+
     try {
       const res = await apiFetch("/api/opinions", {
         method: "POST",
@@ -1985,6 +2022,7 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
           doc_plus_context: docPlusContext,
           mode,
         }),
+        signal: currentAbortController?.signal,
       });
 
       const contentType = res.headers.get("content-type") || "";
@@ -2082,18 +2120,27 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
         }
       }
 
-      await loadHistory();
-
     } catch (e) {
       const thinking = document.getElementById("thinkingBlock");
       if (thinking) thinking.remove();
-      container.innerHTML += `
-        <div class="message ai">
-          <div class="message-bubble" style="color:#b91c1c">${esc(e.message)}</div>
-        </div>`;
+      if (e.name === 'AbortError') {
+        container.innerHTML += `
+          <div class="message ai">
+            <div class="message-bubble" style="color:var(--text-faint)">Stopped.</div>
+          </div>`;
+      } else {
+        container.innerHTML += `
+          <div class="message ai">
+            <div class="message-bubble" style="color:#b91c1c">${esc(e.message)}</div>
+          </div>`;
+      }
     } finally {
       loading = false;
-      document.getElementById("btnSend").disabled = false;
+      currentAbortController = null;
+      const btnSend = document.getElementById("btnSend");
+      btnSend.disabled = false;
+      btnSend.innerHTML = SEND_ICON_SVG;
+      await loadHistory();
     }
   }
 
@@ -2203,7 +2250,7 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     }
 
     el.style.height = "auto";
-    const max = 160;
+    const max = 120;
     const fullScrollHeight = el.scrollHeight;
     const lineHeight = parseFloat(window.getComputedStyle(el).lineHeight) || 20;
     const paddingTop = parseFloat(window.getComputedStyle(el).paddingTop) || 0;

@@ -749,6 +749,7 @@
     max-width: var(--prose-content-width, 720px);
     margin: 0 auto;
     position: relative;
+    padding-bottom: 44px;
     background: var(--input-bg);
     border: 1px solid var(--input-border);
     border-radius: 12px;
@@ -767,7 +768,7 @@
 
   .input-wrap textarea {
     width: 100%;
-    padding: 11px 12px 38px 16px;
+    padding: 11px 12px 6px 16px;
     border: none;
     border-radius: 12px;
     background: transparent;
@@ -778,7 +779,7 @@
     resize: none;
     outline: none;
     overflow: hidden;
-    height: 70px;
+    height: 38px;
     display: block;
     transition: height 0.18s ease;
   }
