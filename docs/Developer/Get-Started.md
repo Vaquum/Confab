@@ -61,7 +61,7 @@ Notes:
   - `GEMINI_THINKING_BUDGET` (default `512`)
   - `GEMINI_INCLUDE_THOUGHTS` (default `false`)
   - `GEMINI_TIMEOUT_SECONDS` (default `45`)
-- Confab uses `gemini-3-pro-preview` as the default Gemini model.
+- Confab uses `gemini-3.1-pro-preview` as the default Gemini model.
 
 ## Supabase Setup
 
