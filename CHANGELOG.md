@@ -494,3 +494,9 @@
 ## v0.7.52 on 3rd of March, 2026
 
 - Refresh `uv.lock` to match `pyproject.toml` metadata so `uv sync --locked` succeeds in CI quality, test, and Playwright workflows.
+
+## v0.7.53 on 14th of April, 2026
+
+- Update non-Claude runtime defaults in `confab/config/settings.py` to `gpt-5.4`, `grok-4.20-0309-reasoning`, and `gemini-3.1-pro-preview`.
+- Update `docs/Developer/Get-Started.md` to keep the documented Gemini default aligned with runtime.
+- Refresh `uv.lock` to match the `pyproject.toml` version bump so `uv sync --locked` continues to succeed in CI.
