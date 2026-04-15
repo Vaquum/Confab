@@ -33,6 +33,15 @@ if __package__:
         run_pr_review_stream,
     )
     from .db import init_db
+    from .prompting import (
+        build_attachment_prompt,
+        build_doc_plus_context,
+        build_doc_plus_model_prompt,
+        build_prompting_client_config,
+        extract_doc_plus_context,
+        extract_doc_plus_user_prompt,
+        wrap_doc_plus_prompt,
+    )
     from .repositories import (
         delete_conversation,
         get_conversation,
@@ -68,6 +77,15 @@ else:
         run_pr_review_stream,
     )
     from confab.db import init_db
+    from confab.prompting import (
+        build_attachment_prompt,
+        build_doc_plus_context,
+        build_doc_plus_model_prompt,
+        build_prompting_client_config,
+        extract_doc_plus_context,
+        extract_doc_plus_user_prompt,
+        wrap_doc_plus_prompt,
+    )
     from confab.repositories import (
         delete_conversation,
         get_conversation,
@@ -109,9 +127,6 @@ ALLOWED_EMAIL_DOMAIN = (
 GUI_HTML_TEMPLATE = STATIC_ROOT.joinpath('gui.html').read_text(encoding='utf-8')
 TYPOGRAPHY_CSS = STATIC_ROOT.joinpath('typography.css').read_text(encoding='utf-8')
 APP_ASSET_ROOT = STATIC_ROOT.joinpath('app')
-DOC_PLUS_CONTEXT_HEADER = '[DOC_PLUS_CONTEXT]'
-DOC_PLUS_CONTEXT_FOOTER = '[/DOC_PLUS_CONTEXT]'
-DOC_PLUS_USER_PROMPT_HEADER = '[DOC_PLUS_USER_PROMPT]'
 HELP_REFERENCE_PATH = Path(__file__).resolve().parent.parent.joinpath(
     'docs',
     'User',
@@ -131,38 +146,20 @@ def _render_gui_html():
         .replace('__SUPABASE_URL__', json.dumps(SUPABASE_URL or ''))
         .replace('__SUPABASE_ANON_KEY__', json.dumps(SUPABASE_ANON_KEY or ''))
         .replace('__ALLOWED_EMAIL_DOMAIN__', json.dumps(ALLOWED_EMAIL_DOMAIN))
+        .replace('__PROMPTING_CONFIG__', json.dumps(build_prompting_client_config()))
     )
 
 
 def _extract_doc_plus_context(prompt: str | None) -> str | None:
-    if not prompt:
-        return None
-    start = prompt.find(DOC_PLUS_CONTEXT_HEADER)
-    end = prompt.find(DOC_PLUS_CONTEXT_FOOTER)
-    if start == -1 or end == -1 or end <= start:
-        return None
-    context = prompt[start + len(DOC_PLUS_CONTEXT_HEADER):end].strip()
-    if not context:
-        return None
-    return context
+    return extract_doc_plus_context(prompt)
 
 
 def _extract_doc_plus_user_prompt(prompt: str | None) -> str:
-    if not prompt:
-        return ''
-    if DOC_PLUS_USER_PROMPT_HEADER not in prompt:
-        return prompt
-    user_prompt = prompt.split(DOC_PLUS_USER_PROMPT_HEADER, maxsplit=1)[1].strip()
-    if not user_prompt:
-        return ''
-    return user_prompt
+    return extract_doc_plus_user_prompt(prompt)
 
 
 def _wrap_doc_plus_prompt(context: str, user_prompt: str) -> str:
-    return (
-        f'{DOC_PLUS_CONTEXT_HEADER}\n{context.strip()}\n{DOC_PLUS_CONTEXT_FOOTER}\n'
-        f'{DOC_PLUS_USER_PROMPT_HEADER}\n{user_prompt.strip()}'
-    )
+    return wrap_doc_plus_prompt(context, user_prompt)
 
 
 def _resolve_doc_plus_context(conversation: dict | None) -> str | None:
@@ -178,6 +175,28 @@ def _resolve_doc_plus_context(conversation: dict | None) -> str | None:
 
 def _display_prompt(prompt: str | None) -> str:
     return _extract_doc_plus_user_prompt(prompt)
+
+
+def _assemble_prompt(req: PromptRequest) -> str:
+    attachments = (
+        [
+            attachment.model_dump()
+            if hasattr(attachment, 'model_dump')
+            else attachment.dict()
+            for attachment in req.attachments
+        ]
+        if req.attachments
+        else []
+    )
+    if not attachments:
+        return req.prompt
+    return build_attachment_prompt(req.prompt, attachments)
+
+
+def _requested_doc_plus_context(req: PromptRequest) -> str:
+    if req.doc_plus_profile is not None:
+        return build_doc_plus_context(req.doc_plus_profile)
+    return (req.doc_plus_context or '').strip()
 
 
 def _get_bearer_token(authorization):
@@ -377,7 +396,8 @@ def api_save_settings(req: SettingsRequest, user=Depends(get_current_user)):
 @app.post('/api/opinions')
 def api_create_opinion(req: PromptRequest, user=Depends(get_current_user)):
     user_id = user['id']
-    mode, clean_prompt = parse_mode(req.prompt)
+    assembled_prompt = _assemble_prompt(req)
+    mode, clean_prompt = parse_mode(assembled_prompt)
     mode_override = (req.mode or '').strip().lower() or None
     if mode_override and mode_override in (
         'chat',
@@ -404,7 +424,7 @@ def api_create_opinion(req: PromptRequest, user=Depends(get_current_user)):
                 'doc_plus',
             ):
                 mode = existing_conversation['mode']
-                clean_prompt = parse_mode(req.prompt)[1]
+                clean_prompt = parse_mode(assembled_prompt)[1]
             elif mode is None:
                 last_msg = (
                     existing_conversation['messages'][-1]
@@ -442,13 +462,13 @@ def api_create_opinion(req: PromptRequest, user=Depends(get_current_user)):
             model_prompt = None
             if mode == 'doc_plus':
                 profile_context = _resolve_doc_plus_context(active_conversation)
-                profile_from_request = (req.doc_plus_context or '').strip()
+                profile_from_request = _requested_doc_plus_context(req)
                 if not profile_context:
                     profile_context = profile_from_request
                     if not profile_context:
                         raise HTTPException(status_code=400, detail='doc+ profile is required')
                     stored_prompt = _wrap_doc_plus_prompt(profile_context, clean_prompt)
-                model_prompt = f'{profile_context}\n\nUser request: {clean_prompt}'
+                model_prompt = build_doc_plus_model_prompt(profile_context, clean_prompt)
 
             result = run_doc(
                 stored_prompt,

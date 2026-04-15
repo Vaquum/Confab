@@ -2,6 +2,7 @@
 
 import json
 
+from ..prompting import build_document_user_prompt
 from ..repositories.conversations import get_conversation
 
 
@@ -39,9 +40,9 @@ def build_doc_history(conversation_id, user_id='cli-local'):
     for message in conversation['messages']:
         user_content = message['prompt']
         if message.get('document'):
-            user_content = (
-                f"Current document:\n\n{message['document']}\n\n---\n\n"
-                f"User request: {message['prompt']}"
+            user_content = build_document_user_prompt(
+                message['prompt'],
+                document=message['document'],
             )
         history.append({'role': 'user', 'content': user_content})
         if message.get('response'):

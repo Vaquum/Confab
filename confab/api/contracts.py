@@ -5,10 +5,17 @@ from typing import Any
 from pydantic import BaseModel
 
 
+class AttachmentRequest(BaseModel):
+    name: str
+    content: str
+
+
 class PromptRequest(BaseModel):
     prompt: str
     conversation_id: str | None = None
     doc_plus_context: str | None = None
+    doc_plus_profile: dict[str, str] | None = None
+    attachments: list[AttachmentRequest] | None = None
     mode: str | None = None
 
 
