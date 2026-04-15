@@ -23,323 +23,22 @@ declare global {
   }
 }
 
-const { supabaseUrl: SUPABASE_URL, supabaseAnonKey: SUPABASE_ANON_KEY, allowedEmailDomain: ALLOWED_EMAIL_DOMAIN } = readClientConfig();
+const {
+  supabaseUrl: SUPABASE_URL,
+  supabaseAnonKey: SUPABASE_ANON_KEY,
+  allowedEmailDomain: ALLOWED_EMAIL_DOMAIN,
+  prompting: PROMPTING_CONFIG,
+} = readClientConfig();
 const supabaseClient = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null;
 const CHAT_ITEM_CLICK_DELAY_MS = 220;
-const DOC_PLUS_BACKGROUND =
-  `A document's reader experience is shaped by attributes operating at six levels: four structural levels of scale (word, sentence, paragraph, section, whole), and one meta level that cuts across all of them. This framework identifies 30 attributes — each independently adjustable, each pinned to a spectrum of A, B, or C. It is not a complete theory of reader cognition; reader experience is also shaped by who the reader is and how they encounter the text. But as a practical system for designing and diagnosing consistency across documents, these 30 attributes are sufficient. Coherence comes from choosing a position on each and holding it, or shifting only with purpose. Drift — unintentional movement along any of these spectrums — is what makes a document feel wrong.
-
-Attribute\tLevel\tA\tB\tC
-Evidential texture\tMeta\tEvidence-heavy — data, examples, citations\tSelective — evidence at key moments\tAssertion-driven — claims on authority or bare statement
-Rhetorical mode\tMeta\tArgumentative — making a case\tExpository — explaining and informing\tNarrative — telling a story
-Temporal orientation\tMeta\tPast — retrospective, historical\tPresent — current state, what is\tFuture — projective, what will or should be
-Reflexivity\tMeta\tTransparent — regularly acknowledges its own structure\tOccasional — signposts at key moments only\tInvisible — never breaks the fourth wall
-Economy\tWord\tSpare — every word earns its place\tBalanced — occasional looseness tolerated\tExpansive — room to breathe, repeat, elaborate
-Precision\tWord\tExacting — the only right word\tAdequate — close enough to land\tSuggestive — deliberately open, letting the reader fill in
-Lexical complexity\tWord\tPlain — simplest word every time\tMixed — plain default, specialist where needed\tSpecialized — assumes reader speaks the domain
-Connotative consistency\tWord\tWarm — word choices carry positive charge\tNeutral — words chosen for meaning, not feeling\tCool — detached, clinical, or critical charge
-Register\tWord\tInformal — conversational, relaxed\tMid — professional but not stiff\tFormal — elevated, institutional
-Rhythm\tSentence\tShort and percussive\tVaried — mixes short and long\tLong and flowing
-Syntactic complexity\tSentence\tLinear — one clause, one idea\tModerate — occasional subordination\tNested — layered, recursive constructions
-Information order\tSentence\tPoint first — then qualify\tMixed — varies by context\tPoint last — build up, then deliver
-Agency\tSentence\tHuman — people do things\tMixed — depends on emphasis\tAbstract — systems, processes, forces act
-Epistemic stance\tSentence\tAssertive — states directly\tMeasured — qualifies where appropriate\tHedged — careful, provisional throughout
-Idea density\tParagraph\tSparse — one idea, fully developed\tModerate — one or two, with room\tDense — multiple ideas, tightly packed
-Abstraction level\tParagraph\tConcrete — stays in specifics and examples\tBlended — moves between both\tAbstract — lives in concepts and generalizations
-Internal structure\tParagraph\tTop-loaded — point first, then development\tMixed — varies by paragraph\tBottom-loaded — builds to the point
-Paragraph length\tParagraph\tShort — two to three sentences\tMedium — four to six sentences\tLong — seven or more, sustained development
-Cohesion\tParagraph\tChained — each sentence picks up the last\tLoose — connected but not sequential\tParallel — sentences stand side by side
-Section weight\tSection\tUniform — sections roughly equal in space\tProportional — weighted to importance\tConcentrated — most weight in one or two sections
-Section sequencing\tSection\tLinear — chronological or causal chain\tModular — self-contained, in logical order\tAssociative — thematic or lateral connections
-Inter-section transition\tSection\tExplicit — bridging passages between sections\tSignposted — brief markers at boundaries\tHard cut — white space, no verbal bridge
-Internal arc\tSection\tShaped — each section builds to something\tMixed — some sections shaped, some flat\tFlat — sections deliver information evenly
-Functional role\tSection\tDifferentiated — each section has a clear, distinct job\tSemi-differentiated — roles mostly clear\tUniform — sections serve similar functions throughout
-Implied reader\tWhole\tExpert — assumes deep familiarity\tInformed — knows the basics, needs the argument\tNewcomer — assumes little, explains as it goes
-Conceptual framing\tWhole\tSingle frame — one governing metaphor throughout\tLight framing — occasional metaphor, not structural\tNo frame — subject treated on its own terms
-Connective texture\tWhole\tExplicit — transitions stated clearly\tSelective — signposts at key turns only\tImplicit — ideas placed, reader infers the link
-Arc\tWhole\tLinear — builds in one direction\tThematic — organized by topic, not sequence\tCircular — returns to where it started, transformed
-Tonal arc\tWhole\tFlat — same emotional temperature throughout\tGradual — slow, deliberate shifts\tDynamic — intentional swings in emotional register
-Voice unity\tWhole\tSingular — unmistakably one mind\tConsistent — cohesive but not distinctive\tComposite — multiple contributors felt, but aligned`;
-const DOC_PLUS_LEVELS = [
-  {
-    id: "meta",
-    label: "Meta",
-    attributes: [
-      {
-        name: "Evidential texture",
-        choices: {
-          A: "Evidence-heavy — data, examples, citations",
-          B: "Selective — evidence at key moments",
-          C: "Assertion-driven — claims on authority or bare statement",
-        },
-      },
-      {
-        name: "Rhetorical mode",
-        choices: {
-          A: "Argumentative — making a case",
-          B: "Expository — explaining and informing",
-          C: "Narrative — telling a story",
-        },
-      },
-      {
-        name: "Temporal orientation",
-        choices: {
-          A: "Past — retrospective, historical",
-          B: "Present — current state, what is",
-          C: "Future — projective, what will or should be",
-        },
-      },
-      {
-        name: "Reflexivity",
-        choices: {
-          A: "Transparent — regularly acknowledges its own structure",
-          B: "Occasional — signposts at key moments only",
-          C: "Invisible — never breaks the fourth wall",
-        },
-      },
-    ],
-  },
-  {
-    id: "whole",
-    label: "Whole",
-    attributes: [
-      {
-        name: "Implied reader",
-        choices: {
-          A: "Expert — assumes deep familiarity",
-          B: "Informed — knows the basics, needs the argument",
-          C: "Newcomer — assumes little, explains as it goes",
-        },
-      },
-      {
-        name: "Conceptual framing",
-        choices: {
-          A: "Single frame — one governing metaphor throughout",
-          B: "Light framing — occasional metaphor, not structural",
-          C: "No frame — subject treated on its own terms",
-        },
-      },
-      {
-        name: "Connective texture",
-        choices: {
-          A: "Explicit — transitions stated clearly",
-          B: "Selective — signposts at key turns only",
-          C: "Implicit — ideas placed, reader infers the link",
-        },
-      },
-      {
-        name: "Arc",
-        choices: {
-          A: "Linear — builds in one direction",
-          B: "Thematic — organized by topic, not sequence",
-          C: "Circular — returns to where it started, transformed",
-        },
-      },
-      {
-        name: "Tonal arc",
-        choices: {
-          A: "Flat — same emotional temperature throughout",
-          B: "Gradual — slow, deliberate shifts",
-          C: "Dynamic — intentional swings in emotional register",
-        },
-      },
-      {
-        name: "Voice unity",
-        choices: {
-          A: "Singular — unmistakably one mind",
-          B: "Consistent — cohesive but not distinctive",
-          C: "Composite — multiple contributors felt, but aligned",
-        },
-      },
-    ],
-  },
-  {
-    id: "section",
-    label: "Section",
-    attributes: [
-      {
-        name: "Section weight",
-        choices: {
-          A: "Uniform — sections roughly equal in space",
-          B: "Proportional — weighted to importance",
-          C: "Concentrated — most weight in one or two sections",
-        },
-      },
-      {
-        name: "Section sequencing",
-        choices: {
-          A: "Linear — chronological or causal chain",
-          B: "Modular — self-contained, in logical order",
-          C: "Associative — thematic or lateral connections",
-        },
-      },
-      {
-        name: "Inter-section transition",
-        choices: {
-          A: "Explicit — bridging passages between sections",
-          B: "Signposted — brief markers at boundaries",
-          C: "Hard cut — white space, no verbal bridge",
-        },
-      },
-      {
-        name: "Internal arc",
-        choices: {
-          A: "Shaped — each section builds to something",
-          B: "Mixed — some sections shaped, some flat",
-          C: "Flat — sections deliver information evenly",
-        },
-      },
-      {
-        name: "Functional role",
-        choices: {
-          A: "Differentiated — each section has a clear, distinct job",
-          B: "Semi-differentiated — roles mostly clear",
-          C: "Uniform — sections serve similar functions throughout",
-        },
-      },
-    ],
-  },
-  {
-    id: "paragraph",
-    label: "Paragraph",
-    attributes: [
-      {
-        name: "Idea density",
-        choices: {
-          A: "Sparse — one idea, fully developed",
-          B: "Moderate — one or two, with room",
-          C: "Dense — multiple ideas, tightly packed",
-        },
-      },
-      {
-        name: "Abstraction level",
-        choices: {
-          A: "Concrete — stays in specifics and examples",
-          B: "Blended — moves between both",
-          C: "Abstract — lives in concepts and generalizations",
-        },
-      },
-      {
-        name: "Internal structure",
-        choices: {
-          A: "Top-loaded — point first, then development",
-          B: "Mixed — varies by paragraph",
-          C: "Bottom-loaded — builds to the point",
-        },
-      },
-      {
-        name: "Paragraph length",
-        choices: {
-          A: "Short — two to three sentences",
-          B: "Medium — four to six sentences",
-          C: "Long — seven or more, sustained development",
-        },
-      },
-      {
-        name: "Cohesion",
-        choices: {
-          A: "Chained — each sentence picks up the last",
-          B: "Loose — connected but not sequential",
-          C: "Parallel — sentences stand side by side",
-        },
-      },
-    ],
-  },
-  {
-    id: "sentence",
-    label: "Sentence",
-    attributes: [
-      {
-        name: "Rhythm",
-        choices: {
-          A: "Short and percussive",
-          B: "Varied — mixes short and long",
-          C: "Long and flowing",
-        },
-      },
-      {
-        name: "Syntactic complexity",
-        choices: {
-          A: "Linear — one clause, one idea",
-          B: "Moderate — occasional subordination",
-          C: "Nested — layered, recursive constructions",
-        },
-      },
-      {
-        name: "Information order",
-        choices: {
-          A: "Point first — then qualify",
-          B: "Mixed — varies by context",
-          C: "Point last — build up, then deliver",
-        },
-      },
-      {
-        name: "Agency",
-        choices: {
-          A: "Human — people do things",
-          B: "Mixed — depends on emphasis",
-          C: "Abstract — systems, processes, forces act",
-        },
-      },
-      {
-        name: "Epistemic stance",
-        choices: {
-          A: "Assertive — states directly",
-          B: "Measured — qualifies where appropriate",
-          C: "Hedged — careful, provisional throughout",
-        },
-      },
-    ],
-  },
-  {
-    id: "word",
-    label: "Word",
-    attributes: [
-      {
-        name: "Economy",
-        choices: {
-          A: "Spare — every word earns its place",
-          B: "Balanced — occasional looseness tolerated",
-          C: "Expansive — room to breathe, repeat, elaborate",
-        },
-      },
-      {
-        name: "Precision",
-        choices: {
-          A: "Exacting — the only right word",
-          B: "Adequate — close enough to land",
-          C: "Suggestive — deliberately open, letting the reader fill in",
-        },
-      },
-      {
-        name: "Lexical complexity",
-        choices: {
-          A: "Plain — simplest word every time",
-          B: "Mixed — plain default, specialist where needed",
-          C: "Specialized — assumes reader speaks the domain",
-        },
-      },
-      {
-        name: "Connotative consistency",
-        choices: {
-          A: "Warm — word choices carry positive charge",
-          B: "Neutral — words chosen for meaning, not feeling",
-          C: "Cool — detached, clinical, or critical charge",
-        },
-      },
-      {
-        name: "Register",
-        choices: {
-          A: "Informal — conversational, relaxed",
-          B: "Mid — professional but not stiff",
-          C: "Formal — elevated, institutional",
-        },
-      },
-    ],
-  },
-];
+const DOC_PLUS_LEVELS = PROMPTING_CONFIG.docPlus.levels;
+const ATTACHMENT_PROMPT_MARKER = PROMPTING_CONFIG.attachments.marker;
+const ATTACHMENT_PROMPT_LABEL_PREFIX = PROMPTING_CONFIG.attachments.labelPrefix;
+if (!DOC_PLUS_LEVELS.length || !ATTACHMENT_PROMPT_MARKER || !ATTACHMENT_PROMPT_LABEL_PREFIX) {
+  throw new Error('Missing prompting config');
+}
 const DOC_PLUS_SELECTIONS_SETTINGS_KEY = 'docPlusSelections';
 const THEME_SETTINGS_KEY = 'theme';
 const THEME_LOCAL_STORAGE_KEY = 'confab_theme';
@@ -735,26 +434,12 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     return SUPPORTED_ATTACHMENT_EXTENSIONS.has(getAttachmentExtension(file.name));
   }
 
-  function buildPromptWithAttachments(rawPrompt, attachments) {
-    if (!attachments.length) {
-      return rawPrompt;
-    }
-    const sections = attachments.map((attachment) => (
-      `Attachment: ${attachment.name}\n---\n${attachment.content}`
-    ));
-    const attachmentBlock = sections.join('\n\n');
-    if (!rawPrompt) {
-      return `[ATTACHMENTS]\n\n${attachmentBlock}`;
-    }
-    return `${rawPrompt}\n\n[ATTACHMENTS]\n\n${attachmentBlock}`;
-  }
-
   function parseAttachmentDisplayPrompt(prompt) {
     if (!prompt || typeof prompt !== 'string') {
       return { text: '', attachmentNames: [] };
     }
-    const marker = '\n\n[ATTACHMENTS]\n\n';
-    const markerPrefix = '[ATTACHMENTS]\n\n';
+    const marker = `\n\n${ATTACHMENT_PROMPT_MARKER}\n\n`;
+    const markerPrefix = `${ATTACHMENT_PROMPT_MARKER}\n\n`;
     let textPart = prompt;
     let attachmentBlock = '';
     if (prompt.includes(marker)) {
@@ -770,8 +455,8 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
 
     const attachmentNames = [];
     for (const line of attachmentBlock.split('\n')) {
-      if (!line.startsWith('Attachment: ')) continue;
-      const attachmentName = line.slice('Attachment: '.length).trim();
+      if (!line.startsWith(ATTACHMENT_PROMPT_LABEL_PREFIX)) continue;
+      const attachmentName = line.slice(ATTACHMENT_PROMPT_LABEL_PREFIX.length).trim();
       if (attachmentName) {
         attachmentNames.push(attachmentName);
       }
@@ -925,25 +610,6 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     }
   }
 
-  function buildDocPlusContext() {
-    const lines = [
-      DOC_PLUS_BACKGROUND,
-      "",
-      "Use this profile for all document collaboration turns in this conversation.",
-      "",
-      "Selected profile:",
-    ];
-    for (const level of DOC_PLUS_LEVELS) {
-      lines.push(`${level.label}:`);
-      for (const attribute of level.attributes) {
-        const choice = docPlusSelections[attribute.name] || "B";
-        lines.push(`- ${attribute.name}: ${choice}: ${attribute.choices[choice]}`);
-      }
-      lines.push("");
-    }
-    return lines.join("\n").trim();
-  }
-
   function closeDocPlusWizard(result) {
     const modal = document.getElementById("docPlusModal");
     if (modal) modal.style.display = "none";
@@ -1022,9 +688,9 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
     next.addEventListener("click", () => {
       const lastStep = DOC_PLUS_LEVELS.length - 1;
       if (docPlusWizardStepIndex >= lastStep) {
-        const context = buildDocPlusContext();
+        const profile = normalizeDocPlusSelections(docPlusSelections);
         void saveDocPlusSelections(docPlusSelections);
-        closeDocPlusWizard(context);
+        closeDocPlusWizard(profile);
         return;
       }
       docPlusWizardStepIndex += 1;
@@ -1936,16 +1602,15 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
       return;
     }
     if ((!rawPrompt && attachmentsForSend.length === 0) || !authSession) return;
-    const prompt = buildPromptWithAttachments(rawPrompt, attachmentsForSend);
 
     // Explicit @prefix wins, otherwise inherit last mode, default to chat
     const detected = detectMode(rawPrompt);
     const mode = (composerModeLock && composerModeLock.mode) || detected || currentMode || "chat";
     let requestConversationId = currentConversationId;
-    let docPlusContext = null;
+    let docPlusProfile = null;
     if (mode === "doc_plus" && currentMode !== "doc_plus") {
-      docPlusContext = await openDocPlusWizard();
-      if (!docPlusContext) return;
+      docPlusProfile = await openDocPlusWizard();
+      if (!docPlusProfile) return;
       if (currentConversationId) {
         newChat();
       }
@@ -2017,9 +1682,10 @@ const HISTORY_EMPTY_RETRY_DELAY_MS = 900;
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt,
+          prompt: rawPrompt,
           conversation_id: requestConversationId,
-          doc_plus_context: docPlusContext,
+          doc_plus_profile: docPlusProfile,
+          attachments: attachmentsForSend,
           mode,
         }),
         signal: currentAbortController?.signal,

@@ -250,7 +250,16 @@ Primary prompt endpoint for chat, help, doc, doc-plus, consensus, and PR review.
 {
   "prompt": "Your prompt (optionally prefixed with /help, /?, /doc, /doc+, /consensus, /pr, @gpt, @grok, @gemini, @claude)",
   "conversation_id": "optional-uuid",
-  "doc_plus_context": "required for first /doc+ turn; omitted for follow-ups",
+  "attachments": [
+    {
+      "name": "optional-file-name.md",
+      "content": "full attachment text content"
+    }
+  ],
+  "doc_plus_profile": {
+    "Evidential texture": "A",
+    "Rhetorical mode": "B"
+  },
   "mode": "optional explicit mode override used by frontend mode-lock"
 }
 ```
@@ -323,8 +332,9 @@ For `doc`:
 For `doc_plus`:
 
 - Response payload shape matches `doc` mode (`response`, plus `document` or `edits`).
-- The first `/doc+` turn must include `doc_plus_context` in request body.
+- The first `/doc+` turn must include `doc_plus_profile` in request body.
 - Follow-up turns in the same `doc_plus` conversation reuse persisted profile context automatically.
+- Backend compatibility note: legacy clients may still send `doc_plus_context` as a prebuilt string, but current clients send structured `doc_plus_profile`.
 
 ### SSE Streaming Modes
 

@@ -64,15 +64,9 @@ test('doc+ enter path opens wizard, submits profile context, and follows up with
   const firstBody = postsAfterFirstSend[0].body as Record<string, unknown>;
   expect(firstBody.prompt).toBe('/doc+ Draft launch memo');
   expect(firstBody.conversation_id).toBeNull();
-  expect(firstBody.doc_plus_context).not.toBeNull();
-  const context = String(firstBody.doc_plus_context);
+  expect(firstBody.doc_plus_profile).not.toBeNull();
+  const profile = firstBody.doc_plus_profile as Record<string, unknown>;
   const requiredMarkers = [
-    'Meta:',
-    'Whole:',
-    'Section:',
-    'Paragraph:',
-    'Sentence:',
-    'Word:',
     'Evidential texture:',
     'Rhetorical mode:',
     'Temporal orientation:',
@@ -105,9 +99,9 @@ test('doc+ enter path opens wizard, submits profile context, and follows up with
     'Register:',
   ];
   for (const marker of requiredMarkers) {
-    expect(context).toContain(marker);
+    expect(Object.keys(profile)).toContain(marker.slice(0, -1));
   }
-  expect(context).toContain('Evidential texture: A:');
+  expect(profile['Evidential texture']).toBe('A');
 
   await expect(page.locator('#docPane')).toHaveClass(/open/);
   await expect(page.locator('#chatList')).toContainText('doc+');
@@ -131,7 +125,7 @@ test('doc+ enter path opens wizard, submits profile context, and follows up with
   const secondBody = postsAfterSecondSend[1].body as Record<string, unknown>;
   expect(secondBody.prompt).toBe('Tighten section two');
   expect(secondBody.conversation_id).toBeTruthy();
-  expect(secondBody.doc_plus_context).toBeNull();
+  expect(secondBody.doc_plus_profile).toBeNull();
 });
 
 test('doc+ send-button path opens wizard and completes submission', async ({ page }) => {

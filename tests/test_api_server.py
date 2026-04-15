@@ -10,6 +10,8 @@ import dotenv
 import requests
 from fastapi.testclient import TestClient
 
+from confab.prompting import build_attachment_prompt, build_doc_plus_context
+
 
 def _noop_load_dotenv(*_args: Any, **_kwargs: Any) -> bool:
     return False
@@ -573,7 +575,8 @@ class ApiServerTestCase(unittest.TestCase):
 
     def test_post_opinions_doc_plus_uses_profile_context(self):
         self._set_auth_override()
-        profile = 'Profile context'
+        profile = {'Evidential texture': 'A'}
+        expected_context = build_doc_plus_context(profile)
         run_doc_payload = {
             'chat': 'Document created.',
             'conversation_id': 'docp-1',
@@ -585,7 +588,7 @@ class ApiServerTestCase(unittest.TestCase):
                 '/api/opinions',
                 json={
                     'prompt': '/doc+ Draft this',
-                    'doc_plus_context': profile,
+                    'doc_plus_profile': profile,
                 },
             )
         self.assertEqual(response.status_code, 200)
@@ -593,25 +596,18 @@ class ApiServerTestCase(unittest.TestCase):
         self.assertEqual(body['mode'], 'doc_plus')
         self.assertEqual(body['conversation_id'], 'docp-1')
         called_prompt = run_doc_mock.call_args.args[0]
-        self.assertIn(server.DOC_PLUS_CONTEXT_HEADER, called_prompt)
-        self.assertIn(server.DOC_PLUS_USER_PROMPT_HEADER, called_prompt)
-        self.assertIn('Draft this', called_prompt)
+        self.assertEqual(server._extract_doc_plus_context(called_prompt), expected_context)
+        self.assertEqual(server._extract_doc_plus_user_prompt(called_prompt), 'Draft this')
         self.assertEqual(run_doc_mock.call_args.kwargs['mode'], 'doc_plus')
         self.assertEqual(
             run_doc_mock.call_args.kwargs['model_prompt'],
-            'Profile context\n\nUser request: Draft this',
+            f'{expected_context}\n\nUser request: Draft this',
         )
 
     def test_post_opinions_doc_plus_reuses_existing_profile_context(self):
         self._set_auth_override()
         profile = 'Persisted profile'
-        wrapped_prompt = (
-            f'{server.DOC_PLUS_CONTEXT_HEADER}\n'
-            f'{profile}\n'
-            f'{server.DOC_PLUS_CONTEXT_FOOTER}\n'
-            f'{server.DOC_PLUS_USER_PROMPT_HEADER}\n'
-            'Initial request'
-        )
+        wrapped_prompt = server._wrap_doc_plus_prompt(profile, 'Initial request')
         conversation = {
             'mode': 'doc_plus',
             'messages': [
@@ -644,13 +640,7 @@ class ApiServerTestCase(unittest.TestCase):
 
     def test_get_conversation_strips_doc_plus_internal_prompt_wrapper(self):
         self._set_auth_override()
-        wrapped_prompt = (
-            f'{server.DOC_PLUS_CONTEXT_HEADER}\n'
-            'Profile\n'
-            f'{server.DOC_PLUS_CONTEXT_FOOTER}\n'
-            f'{server.DOC_PLUS_USER_PROMPT_HEADER}\n'
-            'Visible user prompt'
-        )
+        wrapped_prompt = server._wrap_doc_plus_prompt('Profile', 'Visible user prompt')
         conversation = {
             'conversation_id': 'c-1',
             'mode': 'doc_plus',
@@ -666,12 +656,7 @@ class ApiServerTestCase(unittest.TestCase):
 
     def test_get_conversation_masks_empty_doc_plus_user_prompt(self):
         self._set_auth_override()
-        wrapped_prompt = (
-            f'{server.DOC_PLUS_CONTEXT_HEADER}\n'
-            'Profile\n'
-            f'{server.DOC_PLUS_CONTEXT_FOOTER}\n'
-            f'{server.DOC_PLUS_USER_PROMPT_HEADER}\n'
-        )
+        wrapped_prompt = server._wrap_doc_plus_prompt('Profile', '')
         conversation = {
             'conversation_id': 'c-1',
             'mode': 'doc_plus',
@@ -681,6 +666,28 @@ class ApiServerTestCase(unittest.TestCase):
             response = self.client.get('/api/conversations/c-1')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['messages'][0]['prompt'], '')
+
+    def test_post_opinions_chat_builds_attachment_prompt_from_structured_payload(self):
+        self._set_auth_override()
+        with patch.object(server, 'run_chat', return_value=('ok', 'chat-1')) as run_chat_mock:
+            response = self.client.post(
+                '/api/opinions',
+                json={
+                    'prompt': 'Summarize this',
+                    'attachments': [
+                        {'name': 'notes.md', 'content': '# Notes'},
+                    ],
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['conversation_id'], 'chat-1')
+        self.assertEqual(
+            run_chat_mock.call_args.args[0],
+            build_attachment_prompt(
+                'Summarize this',
+                [{'name': 'notes.md', 'content': '# Notes'}],
+            ),
+        )
 
     def test_post_opinions_consensus_returns_sse_stream(self):
         self._set_auth_override()

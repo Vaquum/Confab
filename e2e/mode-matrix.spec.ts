@@ -69,9 +69,9 @@ for (const scenario of MODE_MATRIX_CASES) {
     expect(body.prompt).toBe(scenario.prompt);
 
     if (scenario.requiresDocPlusWizard) {
-      expect(body.doc_plus_context).toBeTruthy();
+      expect(body.doc_plus_profile).toBeTruthy();
     } else {
-      expect(body.doc_plus_context).toBeNull();
+      expect(body.doc_plus_profile).toBeNull();
     }
   });
 }

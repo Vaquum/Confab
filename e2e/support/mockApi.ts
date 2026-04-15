@@ -274,6 +274,8 @@ export async function installMockApi(
         prompt?: string;
         conversation_id?: string | null;
         doc_plus_context?: string | null;
+        doc_plus_profile?: Record<string, string> | null;
+        attachments?: Array<{ name: string; content: string }> | null;
         mode?: ChatMode | null;
       };
       const prompt = (payload.prompt ?? '').trim();
@@ -301,8 +303,8 @@ export async function installMockApi(
       }
 
       if (mode === 'doc_plus' && conversation.messages.length === 0) {
-        const profile = (payload.doc_plus_context ?? '').trim();
-        if (!profile) {
+        const profile = payload.doc_plus_profile;
+        if (!profile || typeof profile !== 'object' || Object.keys(profile).length === 0) {
           await jsonResponse(route, { detail: 'doc+ profile is required' }, 400);
           return;
         }
