@@ -9,11 +9,16 @@ This document describes the current HTTP API exposed by `confab.server:app`.
 
 ## Authentication
 
-All `/api/*` endpoints except `POST /api/auth/magic-link` require:
+All `/api/*` endpoints require an `Authorization: Bearer <token>` header,
+except `POST /api/auth/magic-link` which is unauthenticated. The token type
+depends on the endpoint:
 
-- `Authorization: Bearer <supabase_access_token>`
+- Most endpoints: a Supabase user-session access token.
+- External integration endpoints (`POST /api/review/pr`, `POST /api/review/topic`):
+  the static `CONFAB_API_KEY` configured on the server. See
+  [External Integration Endpoints](#external-integration-endpoints).
 
-Token validation flow:
+Supabase-token validation flow:
 
 1. Backend calls Supabase `GET /auth/v1/user`.
 2. Backend extracts user id + email.

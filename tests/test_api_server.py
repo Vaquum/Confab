@@ -827,6 +827,20 @@ class ApiServerTestCase(unittest.TestCase):
         self.assertEqual(run_mock.call_args.kwargs['mode'], 'consensus')
         self.assertEqual(run_mock.call_args.kwargs['user_id'], 'api')
 
+    def test_review_topic_rejects_empty_or_whitespace_topic_without_running_models(self):
+        with (
+            patch.object(server, 'CONFAB_API_KEY', 'configured-key'),
+            patch.object(server, 'run_opinions') as run_mock,
+        ):
+            for payload in ({'topic': ''}, {'topic': '   '}, {'topic': '\n\t'}):
+                response = self.client.post(
+                    '/api/review/topic',
+                    headers={'Authorization': 'Bearer configured-key'},
+                    json=payload,
+                )
+                self.assertEqual(response.status_code, 422, msg=payload)
+        run_mock.assert_not_called()
+
     def test_review_topic_returns_500_when_run_opinions_raises(self):
         with (
             patch.object(server, 'CONFAB_API_KEY', 'configured-key'),
