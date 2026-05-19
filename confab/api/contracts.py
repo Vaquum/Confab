@@ -1,8 +1,8 @@
 """API request and response contracts."""
 
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, StringConstraints
 
 
 class AttachmentRequest(BaseModel):
@@ -38,6 +38,10 @@ class MagicLinkRequest(BaseModel):
 
 class PrReviewRequest(BaseModel):
     url: str
+
+
+class TopicReviewRequest(BaseModel):
+    topic: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class PrReviewResponse(BaseModel):

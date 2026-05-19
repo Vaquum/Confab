@@ -9,11 +9,16 @@ This document describes the current HTTP API exposed by `confab.server:app`.
 
 ## Authentication
 
-All `/api/*` endpoints except `POST /api/auth/magic-link` require:
+All `/api/*` endpoints require an `Authorization: Bearer <token>` header,
+except `POST /api/auth/magic-link` which is unauthenticated. The token type
+depends on the endpoint:
 
-- `Authorization: Bearer <supabase_access_token>`
+- Most endpoints: a Supabase user-session access token.
+- External integration endpoints (`POST /api/review/pr`, `POST /api/review/topic`):
+  the static `CONFAB_API_KEY` configured on the server. See
+  [External Integration Endpoints](#external-integration-endpoints).
 
-Token validation flow:
+Supabase-token validation flow:
 
 1. Backend calls Supabase `GET /auth/v1/user`.
 2. Backend extracts user id + email.
@@ -380,6 +385,62 @@ Auth-provider mapping details:
 - Supabase `429` / `5xx` -> API `503`
 - Other non-success auth-provider status -> API `503`
 
+## External Integration Endpoints
+
+These endpoints are intended for server-to-server use. They bypass Supabase user
+auth and instead require the static `CONFAB_API_KEY` configured on the server,
+passed as a Bearer token. Responses are non-streamed JSON.
+
+Auth header for both endpoints:
+
+- `Authorization: Bearer <CONFAB_API_KEY>`
+
+Common errors:
+
+- `401 Missing authorization` — header absent
+- `401 Invalid authorization header` — header is not `Bearer <token>` shape
+- `401 Invalid API key` — token does not match `CONFAB_API_KEY`
+- `500 API key is not configured` — `CONFAB_API_KEY` is not set on the server
+- `500` with detail string — upstream model or workflow failure
+
+### `POST /api/review/pr`
+
+Runs the consensus engine over a GitHub PR.
+
+- Request body:
+
+```json
+{"url": "https://github.com/<owner>/<repo>/pull/<number>"}
+```
+
+- Response body:
+
+```json
+{
+  "synthesis": "Markdown review",
+  "conversation_id": "uuid"
+}
+```
+
+### `POST /api/review/topic`
+
+Runs the consensus engine over a free-form topic or question.
+
+- Request body:
+
+```json
+{"topic": "Should we use Kafka or SQS for event ingestion at our scale?"}
+```
+
+- Response body:
+
+```json
+{
+  "synthesis": "Markdown synthesis",
+  "conversation_id": "uuid"
+}
+```
+
 ## Example Requests
 
 ### Authenticated chat request
@@ -398,4 +459,22 @@ curl -N -X POST "http://localhost:8000/api/opinions" \
   -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"prompt":"/consensus Evaluate this launch plan"}'
+```
+
+### External topic-review request
+
+```bash
+curl -X POST "http://localhost:8000/api/review/topic" \
+  -H "Authorization: Bearer $CONFAB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"topic":"Kafka vs SQS for event ingestion at our scale"}'
+```
+
+### External PR-review request
+
+```bash
+curl -X POST "http://localhost:8000/api/review/pr" \
+  -H "Authorization: Bearer $CONFAB_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://github.com/Vaquum/Confab/pull/18"}'
 ```
