@@ -40,6 +40,10 @@ class PrReviewRequest(BaseModel):
     url: str
 
 
+class TopicReviewRequest(BaseModel):
+    topic: str
+
+
 class PrReviewResponse(BaseModel):
     synthesis: str
     conversation_id: str

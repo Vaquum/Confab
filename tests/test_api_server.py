@@ -775,6 +775,71 @@ class ApiServerTestCase(unittest.TestCase):
         self.assertIn('"Follow-up synthesis"', response.text)
         self.assertEqual(stream_mock.call_args.args[0], 'follow up')
 
+    def test_review_topic_rejects_missing_authorization(self):
+        with patch.object(server, 'CONFAB_API_KEY', 'configured-key'):
+            response = self.client.post(
+                '/api/review/topic',
+                json={'topic': 'Kafka vs SQS'},
+            )
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()['detail'], 'Missing authorization')
+
+    def test_review_topic_rejects_invalid_api_key(self):
+        with patch.object(server, 'CONFAB_API_KEY', 'configured-key'):
+            response = self.client.post(
+                '/api/review/topic',
+                headers={'Authorization': 'Bearer wrong-key'},
+                json={'topic': 'Kafka vs SQS'},
+            )
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()['detail'], 'Invalid API key')
+
+    def test_review_topic_returns_500_when_api_key_not_configured(self):
+        with patch.object(server, 'CONFAB_API_KEY', None):
+            response = self.client.post(
+                '/api/review/topic',
+                headers={'Authorization': 'Bearer any-key'},
+                json={'topic': 'Kafka vs SQS'},
+            )
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json()['detail'], 'API key is not configured')
+
+    def test_review_topic_returns_synthesis_and_conversation_id(self):
+        with (
+            patch.object(server, 'CONFAB_API_KEY', 'configured-key'),
+            patch.object(
+                server,
+                'run_opinions',
+                return_value=('Final synthesis', {}, {}, 'conv-topic-1'),
+            ) as run_mock,
+        ):
+            response = self.client.post(
+                '/api/review/topic',
+                headers={'Authorization': 'Bearer configured-key'},
+                json={'topic': 'Kafka vs SQS at our scale'},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {'synthesis': 'Final synthesis', 'conversation_id': 'conv-topic-1'},
+        )
+        self.assertEqual(run_mock.call_args.args[0], 'Kafka vs SQS at our scale')
+        self.assertEqual(run_mock.call_args.kwargs['mode'], 'consensus')
+        self.assertEqual(run_mock.call_args.kwargs['user_id'], 'api')
+
+    def test_review_topic_returns_500_when_run_opinions_raises(self):
+        with (
+            patch.object(server, 'CONFAB_API_KEY', 'configured-key'),
+            patch.object(server, 'run_opinions', side_effect=RuntimeError('provider failure')),
+        ):
+            response = self.client.post(
+                '/api/review/topic',
+                headers={'Authorization': 'Bearer configured-key'},
+                json={'topic': 'Kafka vs SQS'},
+            )
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json()['detail'], 'provider failure')
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

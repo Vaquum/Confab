@@ -22,12 +22,14 @@ if __package__:
         RenameRequest,
         SettingsRequest,
         SettingsResponse,
+        TopicReviewRequest,
     )
     from .core import (
         get_keys,
         parse_mode,
         run_chat,
         run_doc,
+        run_opinions,
         run_opinions_stream,
         run_pr_review,
         run_pr_review_stream,
@@ -66,12 +68,14 @@ else:
         RenameRequest,
         SettingsRequest,
         SettingsResponse,
+        TopicReviewRequest,
     )
     from confab.core import (
         get_keys,
         parse_mode,
         run_chat,
         run_doc,
+        run_opinions,
         run_opinions_stream,
         run_pr_review,
         run_pr_review_stream,
@@ -540,6 +544,20 @@ def api_review_pr(req: PrReviewRequest, _=Depends(_require_api_key)):
     try:
         synthesis, _responses, _errors, conversation_id = run_pr_review(
             req.url, keys, user_id='api',
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return {
+        'synthesis': synthesis,
+        'conversation_id': conversation_id,
+    }
+
+
+@app.post('/api/review/topic', response_model=PrReviewResponse)
+def api_review_topic(req: TopicReviewRequest, _=Depends(_require_api_key)):
+    try:
+        synthesis, _responses, _errors, conversation_id = run_opinions(
+            req.topic, keys, mode='consensus', user_id='api',
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
